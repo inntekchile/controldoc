@@ -62,7 +62,7 @@ services:
     # Si sigue dando error con 'image', una alternativa sería construir un Dockerfile
     # específico para Nginx en tu repo que use 'FROM nginx:1.21-alpine'
     # y copie la configuración. Pero 'image' debería funcionar.
-    image: nginx:1.21-alpine # Usar imagen preconstruida de Nginx
+    image: 'nginx:1.21-alpine' # Usar imagen preconstruida de Nginx
     # Si quieres configurar Nginx, puedes tener el archivo default.conf en tu repo
     # y tu Dockerfile para Nginx lo copiaría. Ejemplo de cómo podría ser ese Dockerfile:
     # # Dockerfile.nginx (en tu repo)
@@ -78,21 +78,19 @@ services:
     
     # Render maneja el mapeo de puertos externos automáticamente. No necesitas 'ports: "8000:80"'.
     # El puerto 80 del contenedor es el que Render expone.
+    dependsOn:
+      - inntek-app # Asegura que 'inntek-app' se despliegue antes que Nginx.
     routes:
     # Ruta para el servicio Nginx
       - type: http # Tipo de ruta (HTTP/HTTPS)
-        path: /* # Todas las rutas entrantes
-        serviceId: inntek-nginx # Dirige el tráfico al servicio 'inntek-nginx'
         # Aquí es donde 'inntek-nginx' recibirá todo el tráfico.
         # Luego, la configuración interna de Nginx (default.conf) reenviará a 'inntek-app'.
         # Las dependencias son para el orden de despliegue, no para la comunicación de red.
-    dependsOn:
-      - inntek-app # Asegura que 'inntek-app' se despliegue antes que Nginx.
+    
 
   # --- Servicio de Base de Datos (MySQL) ---
   # Render gestiona bases de datos directamente.
 databases:
-  - type: pserv # Servicio persistente (para bases de datos gestionadas)
     name: inntek-db # Nombre único para tu base de datos en Render
     databaseName: laravel_db # Nombre de la base de datos MySQL a crear
     # user: user # Opcional: define el usuario, si no, Render lo genera
