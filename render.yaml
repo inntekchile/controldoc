@@ -1,84 +1,97 @@
-# ==============================================================================
-# Blueprint de Render para Proyecto Laravel (render.yaml)
-# Versión: 1.0
-#
-# Descripción:
-#   Este archivo define la infraestructura completa para desplegar una
-#   aplicación Laravel en Render.com, incluyendo un servidor web,
-#   un worker de aplicación, una base de datos MySQL, un worker de colas y
-#   una instancia de Redis para caché.
-#
-# ==============================================================================
+# render.yaml - Versión 2.0 (Arquitectura Corregida)
+# Este blueprint define la infraestructura para una aplicación Laravel en Render.
 
-# La versión de la especificación del blueprint.
 version: "1"
 
-# --- Definición de los Servicios ---
-# Esta sección es el equivalente a la sección 'services' de docker-compose.
 services:
-
   # ----------------------------------------------------------------------------
-  # Servicio 1: Servidor Web (Nginx) - El punto de entrada público.
+  # Servicio Web Principal (Nginx + PHP-FPM)
   # ----------------------------------------------------------------------------
   - type: web
-    name: inntek-nginx
-    # El runtime es 'image' porque usamos una imagen pre-construida de Docker Hub.
-    runtime: image
-    image:
-      url: nginx:1.21-alpine
-    # Render gestiona los puertos automáticamente para los servicios web.
-    # No es necesario definir 'ports' como en docker-compose.
-    # El código se clona del repo principal por defecto.
-    repo: https://github.com/tu-usuario/tu-proyecto.git # ¡IMPORTANTE! Reemplazar con tu repo.
-    # Los 'volumes' de docker-compose para el código y la config se manejan
-    # implícitamente por Render y los archivos del repositorio.
-    # Necesitaríamos una forma de sobreescribir la config de Nginx,
-    # a menudo se hace en el Dockerfile de la app o con un script.
-    # Para simplicidad, asumimos que Nginx está configurado en el Dockerfile de la app.
-
-  # ----------------------------------------------------------------------------
-  # Servicio 2: Aplicación (PHP-FPM) - El cerebro de Laravel.
-  # ----------------------------------------------------------------------------
-  - type: pserv # 'pserv' (Private Service) porque no debe ser accesible desde internet.
     name: inntek-app
-    # El runtime es 'docker' porque se construye desde nuestro Dockerfile.
     runtime: docker
     repo: https://github.com/tu-usuario/tu-proyecto.git # ¡IMPORTANTE! Reemplazar.
     branch: main
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    # 'preDeployCommand' es perfecto para migraciones y configuración.
-    preDeployCommand: "php artisan migrate --force"
-    # El 'startCommand' es el CMD del Dockerfile, pero podemos ser explícitos.
-    startCommand: "php-fpm8.2 -F"
+    healthCheck:
+      path: /api/health # Un endpoint simple en tu app que retorne 200 OK.
+    preDeployCommand:
+      - "php artisan migrate --force"
+      - "php artisan config:cache"
+      - "php artisan route:cache"
+      - "php artisan view:cache"
     envVars:
-      # Las variables se extraen de otros servicios.
+      - fromGroup: app-secrets # Grupo para todas las claves y configuraciones.
+
+  # ----------------------------------------------------------------------------
+  # Servicio Worker de Colas
+  # ----------------------------------------------------------------------------
+  - type: worker
+    name: inntek-queue
+    runtime: docker
+    repo: https://github.com/tu-usuario/tu-proyecto.git # ¡IMPORTANTE! Reemplazar.
+    branch: main
+    dockerfilePath: ./Dockerfile.worker
+    dockerContext: .
+    envVars:
+      - fromGroup: app-secrets # Comparte las mismas variables que la app web.
+
+  # ----------------------------------------------------------------------------
+  # Servicio de Caché/Colas (Redis)
+  # ----------------------------------------------------------------------------
+  - type: redis
+    name: inntek-redis
+    ipAllowList: [] # Solo permite conexiones internas.
+    plan: free
+
+# --- Definición de la Base de Datos ---
+databases:
+  - name: inntek-db
+    databaseName: inntek_laravel_db
+    user: inntek_user
+    plan: free
+
+# --- Grupo de Variables de Entorno ---
+# Centraliza todas las variables para facilitar la gestión.
+envVarGroups:
+  - name: app-secrets
+    envVars:
       - key: APP_URL
-        value: https://${RENDER_EXTERNAL_URL} # Variable especial de Render
-      - key: DB_CONNECTION
-        value: mysql
-      - key: DB_HOST
         fromService:
-          type: dpg # dpg (PostgreSQL) o pserv (MySQL)
-          name: inntek-mysql # Nombre del servicio de base de datos
+          type: web
+          name: inntek-app
+          property: url
+      - key: APP_KEY
+        generateValue: true # Render generará una clave segura en el primer despliegue.
+      - key: APP_ENV
+        value: production
+      - key: LOG_CHANNEL
+        value: stderr
+      # Conexión a la Base de Datos
+      - key: DB_CONNECTION
+        value: mysql # Asumiendo que usas MySQL en un servicio privado, o postgres si usas la DB de Render.
+      - key: DB_HOST
+        fromDatabase:
+          name: inntek-db
           property: host
       - key: DB_PORT
-        fromService:
-          type: dpg
-          name: inntek-mysql
+        fromDatabase:
+          name: inntek-db
           property: port
       - key: DB_DATABASE
         fromDatabase:
-          name: inntek-mysql
+          name: inntek-db
           property: database
       - key: DB_USERNAME
         fromDatabase:
-          name: inntek-mysql
+          name: inntek-db
           property: user
       - key: DB_PASSWORD
         fromDatabase:
-          name: inntek-mysql
+          name: inntek-db
           property: password
+      # Conexión a Redis
       - key: REDIS_HOST
         fromService:
           type: redis
@@ -89,57 +102,7 @@ services:
           type: redis
           name: inntek-redis
           property: port
-      - fromGroup: laravel-secrets # Grupo para claves de API, etc.
-
-  # ----------------------------------------------------------------------------
-  # Servicio 3: Worker de Colas
-  # ----------------------------------------------------------------------------
-  - type: worker
-    name: inntek-queue
-    runtime: docker
-    repo: https://github.com/tu-usuario/tu-proyecto.git # ¡IMPORTANTE! Reemplazar.
-    branch: main
-    dockerfilePath: ./Dockerfile
-    dockerContext: .
-    startCommand: "php artisan queue:work redis --sleep=3 --tries=3"
-    envVars:
-      # Hereda las mismas variables que el servicio 'app'.
-      - fromGroup: laravel-secrets
-      - key: DB_HOST
-        fromService: { type: dpg, name: inntek-mysql, property: host }
-      - key: REDIS_HOST
-        fromService: { type: redis, name: inntek-redis, property: host }
-      # ... (y el resto de variables de DB y Redis)
-
-  # ----------------------------------------------------------------------------
-  # Servicio 4: Redis (Caché y Colas)
-  # ----------------------------------------------------------------------------
-  - type: redis
-    name: inntek-redis
-    ipAllowList: [] # Solo permite conexiones internas desde otros servicios Render.
-    plan: free # El plan gratuito es suficiente para empezar.
-
-# --- Definición de la Base de Datos ---
-# Render no soporta MySQL en su spec de blueprints, solo PostgreSQL.
-# Asumiremos que usaríamos PostgreSQL para un despliegue nativo en Render.
-# Si se necesitara MySQL, se usaría un servicio privado (pserv) con una imagen de MySQL.
-databases:
-  - name: inntek-mysql # Aunque la sección es para PostgreSQL, nombramos así por consistencia.
-    databaseName: inntek_laravel_db
-    user: inntek_user
-    plan: free # El plan gratuito es suficiente para desarrollo.
-
-# --- Grupos de Variables de Entorno ---
-# Ideal para guardar secretos y configuraciones compartidas.
-envVarGroups:
-  - name: laravel-secrets
-    envVars:
-      - key: APP_KEY
-        generateValue: true # Render generará una clave segura.
-      - key: APP_ENV
-        value: production
-      - key: LOG_CHANNEL
-        value: stderr
-      # Aquí irían tus claves de API (Stripe, Mailgun, etc.)
-      # - key: MAIL_PASSWORD
-      #   sync: false # No se guarda en el YAML, se introduce en el dashboard.
+      - key: QUEUE_CONNECTION
+        value: redis
+      - key: SESSION_DRIVER
+        value: redis
