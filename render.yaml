@@ -101,14 +101,3 @@ services:
       - "63791:6379"
     networks:
       - inntek-network
-
-# --- Redes y Volúmenes ---
-# Define la red privada para que los contenedores se comuniquen.
-networks:
-  inntek-network:
-    driver: bridge
-
-# Define el volumen persistente para los datos de MySQL.
-volumes:
-  inntek-db-data:
-    driver: local
