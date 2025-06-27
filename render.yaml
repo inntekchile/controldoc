@@ -18,8 +18,6 @@ services:
     # El comando de inicio de tu aplicación (e.g., php-fpm) debería estar en tu Dockerfile.
     # Si necesitas ejecutar algo específico al inicio, usa startCommand:
     # startCommand: php-fpm # Ejemplo, si tu Dockerfile no lo inicia automáticamente
-    pullRequestPreviews: # Opcional: configurar despliegues de previews para PRs
-      autoDeploy: true
     envVars: # Variables de entorno para la aplicación (si Laravel las necesita)
       - key: APP_ENV
         value: production
