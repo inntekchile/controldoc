@@ -19,7 +19,7 @@ services:
   # Equivalente a un 'web service' en Render. Solo sirve archivos estáticos
   # y redirige las peticiones PHP al servicio 'app'.
   nginx:
-    image: nginx:1.21-alpine
+    image: 'nginx:1.21-alpine'
     container_name: inntek-nginx
     restart: unless-stopped
     ports:
