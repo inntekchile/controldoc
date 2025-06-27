@@ -1,103 +1,148 @@
-      
-# ==============================================================================
-# Docker Compose Definitivo para Proyecto Laravel - Inspirado en render.yaml
-# Versión: 2.0
-#
-# Este archivo orquesta 4 servicios principales para una aplicación Laravel robusta:
-#   - nginx: Servidor web que actúa como proxy inverso.
-#   - app: Contenedor PHP-FPM que ejecuta la lógica de la aplicación.
-#   - db: Servidor de base de datos MySQL 8.
-#   - queue: Worker dedicado para procesar trabajos en segundo plano.
-#   - redis: Servidor de caché y colas en memoria.
-#
-# ==============================================================================
+# render.yaml
 
-version: '3.8'
-
+# Define los servicios que serán desplegados en Render.com
 services:
-  # --- Servicio NGINX (El Servidor Web) ---
-  # Equivalente a un 'web service' en Render. Solo sirve archivos estáticos
-  # y redirige las peticiones PHP al servicio 'app'.
-  nginx:
-    image: 'nginx:1.21-alpine'
-    container_name: inntek-nginx
-    restart: unless-stopped
-    ports:
-      - "8000:80"  # Expone el puerto 80 del contenedor al 8000 de la máquina local.
-    volumes:
-      - ./app:/var/www
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
-    depends_on:
-      - app
-      - db
-    networks:
-      - inntek-network
+  # --- Servicio APP (Aplicación Laravel PHP-FPM) ---
+  # Esto será un "Web Service" en Render, ya que Nginx actuará como proxy
+  # y este servicio recibirá las peticiones de Nginx.
+  - type: web
+    name: inntek-app # Nombre del servicio en Render
+    runtime: docker # Indicamos que se construye desde un Dockerfile
+    repo: https://github.com/tu_usuario/tu_repo_laravel.git # ¡ACTUALIZA ESTA URL!
+    # Render clonará el repositorio y buscará el Dockerfile.
+    # context y dockerfile se infieren si están en la raíz, pero puedes especificarlos:
+    # dockerContext: . # Ruta al contexto de construcción del Dockerfile (por defecto es la raíz del repo)
+    # dockerfilePath: Dockerfile # Ruta al Dockerfile (por defecto es Dockerfile en el contexto)
+    # El 'working_dir' es /var/www por defecto si tu Dockerfile lo establece.
+    # Volumes como ./app:/var/www no son necesarios; Render ya monta el repo en el contenedor.
+    # El comando de inicio de tu aplicación (e.g., php-fpm) debería estar en tu Dockerfile.
+    # Si necesitas ejecutar algo específico al inicio, usa startCommand:
+    # startCommand: php-fpm # Ejemplo, si tu Dockerfile no lo inicia automáticamente
+    pullRequestPreviews: # Opcional: configurar despliegues de previews para PRs
+      autoDeploy: true
+    envVars: # Variables de entorno para la aplicación (si Laravel las necesita)
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: DB_CONNECTION
+        value: mysql
+      - key: DB_HOST # Render inyecta el hostname de la DB
+        fromService:
+          type: pserv # Tipo de servicio persistente (base de datos)
+          name: inntek-db # Nombre del servicio de la base de datos en Render
+          property: host
+      - key: DB_PORT
+        fromService:
+          type: pserv
+          name: inntek-db
+          property: port
+      - key: DB_DATABASE
+        fromService:
+          type: pserv
+          name: inntek-db
+          property: databaseName
+      - key: DB_USERNAME
+        fromService:
+          type: pserv
+          name: inntek-db
+          property: user
+      - key: DB_PASSWORD
+        fromService:
+          type: pserv
+          name: inntek-db
+          property: password
+      # Agrega cualquier otra variable de entorno de tu .env de Laravel aquí,
+      # especialmente si son sensibles (usa generateValue: true para Render)
 
-  # --- Servicio APP (El Corazón de Laravel - PHP-FPM) ---
-  # Equivalente a un 'worker' o 'private service' en Render.
-  # No está expuesto directamente a internet.
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: inntek-app
-    restart: unless-stopped
-    working_dir: /var/www
-    volumes:
-      - ./app:/var/www
-    networks:
-      - inntek-network
+  # --- Servicio Nginx (Servidor Web / Proxy Inverso) ---
+  # Este también será un "Web Service" expuesto a Internet.
+  - type: web
+    name: inntek-nginx # Nombre del servicio en Render
+    runtime: docker # Indicamos que usa Docker
+    # Si quieres usar la imagen preconstruida de Nginx de Docker Hub:
+    image: nginx:1.21-alpine # Render descargará esta imagen
+    # Si quieres construir Nginx desde un Dockerfile en tu repo, cambia 'image' por 'build' y especifica context/dockerfile.
+    # Pero para Nginx, generalmente usas una imagen preconstruida y montas la configuración.
+    repo: https://github.com/tu_usuario/tu_repo_laravel.git # ¡ACTUALIZA ESTA URL!
+    # Render permite "mounting files from repo" para configuraciones
+    # No hay un equivalente directo de 'volumes' como en Docker Compose para configurar Nginx
+    # La forma preferida es tener la configuración de Nginx en el propio repositorio
+    # y referenciarla en el Dockerfile del servicio Nginx, o usar un buildCommand.
+    # Aquí un enfoque es que tu Dockerfile para Nginx copie la conf:
+    # Si tu Dockerfile para Nginx está en './nginx/Dockerfile'
+    # dockerfilePath: ./nginx/Dockerfile
+    # dockerContext: ./nginx # Si el contexto de build es el directorio 'nginx'
+    # o si quieres montar archivos, puedes usar un buildCommand que los configure.
+    # Para Nginx, lo más simple es tener la conf en el repo y que un Dockerfile
+    # la copie, o que el 'startCommand' la mueva.
+    # Por ejemplo, si tu Dockerfile para Nginx copia default.conf al lugar correcto.
+    # Ejemplo de un startCommand si necesitas copiar el archivo *después* del build
+    # startCommand: cp /var/www/nginx/default.conf /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'
+    # El puerto 80 del contenedor es el que Render expone automáticamente como el puerto HTTP/HTTPS.
+    # No necesitas 'ports: - "8000:80"', Render maneja el mapeo externo automáticamente.
+    routes:
+      - path: /* # Ruta por defecto para este servicio
+        serviceId: inntek-app # Reenvía todas las peticiones al servicio 'inntek-app'
+        # Esto asume que Nginx solo actúa como proxy para la app PHP.
+        # Si Nginx también sirve estáticos, necesitarías configurarlo en su Dockerfile/config.
+
+    # Dependencia del servicio 'app'. Render maneja esto internamente.
+    # Puedes usar 'dependsOn' para definir orden de despliegue si es crítico.
+    dependsOn:
+      - inntek-app
 
   # --- Servicio de Base de Datos (MySQL) ---
-  # Equivalente a un 'database' en Render.
-  db:
-    image: mysql:8.0
-    container_name: inntek-db
-    restart: unless-stopped
-    environment:
-      MYSQL_DATABASE: ${DB_DATABASE:-laravel_db}
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password}
-      MYSQL_USER: ${DB_USERNAME:-user}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-password}
-    volumes:
-      - inntek-db-data:/var/lib/mysql
-    ports:
-      # Expone el puerto para permitir conexiones externas si es necesario.
-      - "33061:3306"
-    networks:
-      - inntek-network
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      timeout: 20s
-      retries: 10
+  # Render ofrece bases de datos gestionadas. Es la forma recomendada.
+  # No despliegas un contenedor MySQL directamente con 'image: mysql'.
+  # En su lugar, defines una "Database" en Render.
+  - type: pserv # Persistent Service (para bases de datos, etc.)
+    name: inntek-db # Nombre para tu base de datos en Render
+    databaseName: laravel_db # Nombre de la base de datos dentro de MySQL
+    plan: starter # Opcional: plan de base de datos (starter, standard, etc.)
+    # user y password serán generados por Render, o puedes especificarlos.
+    # Si no especificas, Render genera y te da las credenciales.
+    # Puedes acceder a las credenciales generadas en tus servicios usando fromService.
+    # Ejemplo: user: myuser, password: mypassword (no recomendado para prod)
+    # Los volúmenes son manejados automáticamente por Render para bases de datos persistentes.
+    # No necesitas 'ports: - "33061:3306"', Render las hace accesibles internamente.
 
-  # --- Servicio de Cola (Queue Worker) ---
-  # Equivalente a un 'worker' en Render.
-  # Ejecuta los trabajos en segundo plano (emails, notificaciones, etc.).
-  queue:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: inntek-queue
-    restart: unless-stopped
-    # El 'startCommand' de Render se traduce aquí en el 'command'.
-    command: php artisan queue:work --sleep=3 --tries=3
-    working_dir: /var/www
-    volumes:
-      - ./app:/var/www
-    depends_on:
-      - app
-      - redis
-    networks:
-      - inntek-network
+# --- Secciones para volúmenes y redes (manejadas de forma diferente por Render) ---
+# Render no tiene una sección 'networks' o 'volumes' como Docker Compose.
+# Las redes internas son automáticas.
+# La persistencia de datos para las bases de datos se maneja a través de 'type: pserv'
+# o si es un servicio personalizado, a través de 'disk:'.
 
-  # --- Servicio de Caché/Colas (Redis) ---
-  # Equivalente a un 'key-value store' como Redis en Render.
-  redis:
-    image: redis:6.2-alpine
-    container_name: inntek-redis
-    restart: unless-stopped
-    ports:
-      - "63791:6379"
-    networks:
-      - inntek-network
+# Si necesitas un servicio de colas como Redis, lo definirías así:
+# - type: keyvalue # Redis es un "Key-Value Store" en Render
+#   name: inntek-redis
+#   plan: starter # Plan para Redis
+#   # Las credenciales de Redis también se pueden inyectar usando fromService en 'inntek-app' y 'queue'
+
+# Si tienes un worker para las colas (como tu servicio 'queue'):
+# - type: worker # Tipo de servicio "Worker"
+#   name: inntek-queue
+#   runtime: docker
+#   repo: https://github.com/inntekchile/controldoc.git # Mismo repo
+#   dockerfilePath: Dockerfile # O el Dockerfile específico para el worker si es diferente
+#   # command: php artisan queue:work --sleep=3 --tries=3 # El comando para iniciar el worker
+#   envVars:
+#     - key: REDIS_HOST
+#       fromService:
+#         type: keyvalue
+#         name: inntek-redis # Nombre de tu servicio Redis en Render
+#         property: host
+#     - key: REDIS_PORT
+#       fromService:
+#         type: keyvalue
+#         name: inntek-redis
+#         property: port
+#   dependsOn:
+#     - inntek-app # Depende de la app si el worker necesita rutas de la app
+#     - inntek-redis # Depende de Redis
+
+# Puedes añadir otras configuraciones globales de Render aquí si es necesario
+# Por ejemplo, para configurar vistas previas de despliegue para Pull Requests
+pullRequestPreviews:
+  autoDeploy: true # Despliega automáticamente vistas previas para cada PR
+  autoDestroy: true # Destruye las vistas previas después de que el PR se cierra
