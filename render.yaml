@@ -1,0 +1,110 @@
+# render.yaml - Versión 2.0 (Arquitectura Corregida)
+# Este blueprint define la infraestructura para una aplicación Laravel en Render.
+
+version: "1"
+
+services:
+  # ----------------------------------------------------------------------------
+  # Servicio Web Principal (Nginx + PHP-FPM)
+  # ----------------------------------------------------------------------------
+  - type: web
+    name: inntek-app
+    runtime: docker
+    repo: https://github.com/tu-usuario/tu-proyecto.git # ¡IMPORTANTE! Reemplazar.
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    preDeployCommand: 'php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan view:cache'
+    envVars:
+      - fromGroup: app-secrets # Grupo para todas las claves y configuraciones.
+
+  # ----------------------------------------------------------------------------
+  # Servicio Worker de Colas
+  # ----------------------------------------------------------------------------
+  - type: worker
+    name: inntek-queue
+    runtime: docker
+    repo: https://github.com/tu-usuario/tu-proyecto.git # ¡IMPORTANTE! Reemplazar.
+    branch: main
+    dockerfilePath: ./Dockerfile.worker
+    dockerContext: .
+    envVars:
+      - fromGroup: app-secrets # Comparte las mismas variables que la app web.
+
+  # ----------------------------------------------------------------------------
+  # Servicio de Caché/Colas (Redis)
+  # ----------------------------------------------------------------------------
+  - type: redis
+    name: inntek-redis
+    ipAllowList: [] # Solo permite conexiones internas.
+    plan: free
+
+# --- Definición de la Base de Datos ---
+databases:
+  - name: inntek-db
+    databaseName: inntek_laravel_db
+    user: inntek_user
+    plan: free
+
+# --- Grupo de Variables de Entorno ---
+# Centraliza todas las variables para facilitar la gestión.
+envVarGroups:
+  - name: app-secrets
+    envVars:
+      - key: APP_URL
+        fromService:
+          type: web
+          name: inntek-app
+          property: url
+        value: 0
+      - key: APP_KEY
+        generateValue: true # Render generará una clave segura en el primer despliegue.
+      - key: APP_ENV
+        value: production
+      - key: LOG_CHANNEL
+        value: stderr
+      # Conexión a la Base de Datos
+      - key: DB_CONNECTION
+        value: mysql # Asumiendo que usas MySQL en un servicio privado, o postgres si usas la DB de Render.
+      - key: DB_HOST
+        fromDatabase:
+          name: inntek-db
+          property: host
+        value: controldoc
+      - key: DB_PORT
+        fromDatabase:
+          name: inntek-db
+          property: port
+        value: 3600
+      - key: DB_DATABASE
+        fromDatabase:
+          name: inntek-db
+          property: database
+        value: controldoc
+      - key: DB_USERNAME
+        fromDatabase:
+          name: inntek-db
+          property: user
+        value: controldoc
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: inntek-db
+          property: password
+        value: controldoc
+      # Conexión a Redis
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: inntek-redis
+          property: host
+        value: inntek_redis
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: inntek-redis
+          property: port
+        value: 3000
+      - key: QUEUE_CONNECTION
+        value: redis
+      - key: SESSION_DRIVER
+        value: redis

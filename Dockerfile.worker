@@ -1,0 +1,29 @@
+# Dockerfile para el worker de colas
+
+# Usar la misma base que el contenedor de la aplicación para consistencia
+FROM ubuntu:22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Instalar dependencias mínimas para ejecutar los hooks y la app
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common curl git unzip php8.2-cli php8.2-mysql \
+    php8.2-redis php8.2-bcmath php8.2-intl && \
+    add-apt-repository ppa:ondrej/php -y && apt-get update
+
+RUN apt-get install -y php8.2-cli
+
+# Instalar Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+# Establecer directorio de trabajo
+WORKDIR /var/www
+
+# Copiar solo los archivos necesarios para el worker
+COPY app /var/www
+
+# Instalar dependencias de composer
+RUN composer install --optimize-autoloader --no-dev
+
+# Comando de inicio para el worker
+CMD ["php", "artisan", "queue:work", "redis", "--sleep=3", "--tries=3"]
