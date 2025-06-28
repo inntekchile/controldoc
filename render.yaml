@@ -14,8 +14,7 @@ services:
     branch: main
     dockerfilePath: ./Dockerfile
     dockerContext: .
-    preDeployCommand:
-      - php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan view:cache
+    preDeployCommand: 'php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan view:cache'
     envVars:
       - fromGroup: app-secrets # Grupo para todas las claves y configuraciones.
 
