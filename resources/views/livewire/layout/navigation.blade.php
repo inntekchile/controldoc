@@ -2,11 +2,39 @@
 
 use App\Livewire\Actions\Logout;
 use Livewire\Volt\Component;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 
 new class extends Component
 {
-    public function logout(Logout $logout): void
-    {
+    public array $rutasDeListadosUniversales = [
+        'gestion.listados.hub', 'gestion.documentos', 'gestion.rubros',
+        'gestion.tipos-empresa-legal', 'gestion.nacionalidades',
+        'gestion.tipos-condicion-personal', 'gestion.tipos-condicion',
+        'gestion.sexos', 'gestion.estados-civiles', 'gestion.etnias',
+        'gestion.niveles-educacionales', 'gestion.criterios-evaluacion',
+        'gestion.sub-criterios', 'gestion.condiciones-fecha-ingreso',
+        'gestion.configuraciones-validacion', 'gestion.textos-rechazo',
+        'gestion.aclaraciones-criterio', 'gestion.observaciones-documento',
+        'gestion.tipos-carga', 'gestion.tipos-vencimiento',
+        'gestion.tipos-entidad-controlable', 'gestion.rangos-cantidad-trabajadores',
+        'gestion.mutualidades', 'gestion.regiones', 'gestion.comunas',
+        'gestion.formatos-muestra', 'gestion.tipos-vehiculo',
+        'gestion.tipos-maquinaria', 'gestion.tipos-embarcacion',
+        'gestion.marcas-vehiculo', 'gestion.colores-vehiculo',
+        'gestion.tenencias-vehiculo',
+    ];
+
+    public function isListadosUniversalesActive(): bool {
+        return in_array(Route::currentRouteName(), $this->rutasDeListadosUniversales);
+    }
+    public function isContratistaPanelActive(string $tab = ''): bool {
+        if (!request()->routeIs('contratista.panel')) { return false; }
+        if ($tab && request()->query('tab_inicial') === $tab) { return true; }
+        if (!$tab && request()->routeIs('contratista.panel') && !request()->query('tab_inicial')) { return true; }
+        return false;
+    }
+    public function logout(Logout $logout): void {
         $logout();
         $this->redirect('/', navigate: true);
     }
@@ -30,57 +58,59 @@ new class extends Component
                         {{ __('Dashboard') }}
                     </x-nav-link>
 
-                    {{-- Menú para ASEM_Admin --}}
+                    {{-- Menú para ASEM (Admin y Validador) --}}
+                    @if(Auth::user() && Auth::user()->hasAnyRole(['ASEM_Admin', 'ASEM_Validator']))
+                        <x-nav-link :href="route('asem.panel-validacion')" :active="request()->routeIs('asem.panel-validacion')" wire:navigate>
+                            {{ __('Panel de Validación') }}
+                        </x-nav-link>
+                    @endif
+
+                    {{-- Menú exclusivo para ASEM_Admin --}}
                     @if(Auth::user() && Auth::user()->hasRole('ASEM_Admin'))
-                        <x-nav-link :href="route('gestion.listados.hub')"
-                                    :active="request()->routeIs('gestion.listados.hub') || (
-                                                Str::startsWith(Route::currentRouteName(), 'gestion.') &&
-                                                !request()->routeIs('gestion.mandantes') &&
-                                                !request()->routeIs('gestion.contratistas') &&
-                                                !request()->routeIs('gestion.unidades-organizacionales-mandante') &&
-                                                !request()->routeIs('gestion.cargos-mandante') &&
-                                                !request()->routeIs('gestion.documentos.consulta') &&
-                                                !request()->routeIs('gestion.reglas-documentales') &&
-                                                (Route::currentRouteName() !== 'gestion.documentos')
-                                            )"
-                                    wire:navigate>
+                        <x-nav-link :href="route('gestion.asignacion-documentos')" :active="request()->routeIs('gestion.asignacion-documentos')" wire:navigate>
+                            {{ __('Asignar Documentos') }}
+                        </x-nav-link>
+
+                        {{-- ============================================= --}}
+                        {{-- INICIO: NUEVO ENLACE ESCRITORIO --}}
+                        {{-- ============================================= --}}
+                        <x-nav-link :href="route('gestion.gestion-general')" :active="request()->routeIs('gestion.gestion-general')" wire:navigate>
+                            {{ __('Gestión General') }}
+                        </x-nav-link>
+                        {{-- ============================================= --}}
+                        {{-- FIN: NUEVO ENLACE ESCRITORIO --}}
+                        {{-- ============================================= --}}
+
+                        <x-nav-link :href="route('gestion.listados.hub')" :active="$this->isListadosUniversalesActive()" wire:navigate>
                             {{ __('Listados Universales') }}
                         </x-nav-link>
-                        <x-nav-link :href="route('gestion.mandantes')"
-                                    :active="request()->routeIs('gestion.mandantes') || request()->routeIs('gestion.unidades-organizacionales-mandante') || request()->routeIs('gestion.cargos-mandante')"
-                                    wire:navigate>
+                        <x-nav-link :href="route('gestion.mandantes')" :active="request()->routeIs('gestion.mandantes')" wire:navigate>
                             {{ __('Mandantes') }}
                         </x-nav-link>
-                        <x-nav-link :href="route('gestion.contratistas')"
-                                    :active="request()->routeIs('gestion.contratistas')"
-                                    wire:navigate>
+                        <x-nav-link :href="route('gestion.contratistas')" :active="request()->routeIs('gestion.contratistas')" wire:navigate>
                             {{ __('Contratistas ASEM') }}
                         </x-nav-link>
                         <x-nav-link :href="route('gestion.reglas-documentales')" :active="request()->routeIs('gestion.reglas-documentales')" wire:navigate>
                             {{ __('Reglas Documentales') }}
                         </x-nav-link>
+                        <x-nav-link :href="route('gestion.usuarios')" :active="request()->routeIs('gestion.usuarios')" wire:navigate>
+                            {{ __('Usuarios ASEM') }}
+                        </x-nav-link>
                     @endif
 
                     {{-- Menú para Contratista_Admin --}}
                     @if(Auth::user() && Auth::user()->hasRole('Contratista_Admin'))
-                        <x-nav-link :href="route('contratista.mi-ficha')"
-                                    :active="request()->routeIs('contratista.mi-ficha')" wire:navigate>
-                            {{ __('Mi Ficha Empresa') }}
+                        <x-nav-link :href="route('contratista.panel')" :active="$this->isContratistaPanelActive()" wire:navigate>
+                            {{ __('Panel Operación') }}
                         </x-nav-link>
-                        <x-nav-link :href="route('contratista.trabajadores')"
-                                    :active="request()->routeIs('contratista.trabajadores')" wire:navigate>
-                            {{ __('Trabajadores') }}
-                        </x-nav-link>
-                        <x-nav-link :href="route('gestion.documentos.consulta')"
-                                    :active="request()->routeIs('gestion.documentos.consulta')"
-                                    wire:navigate>
+                        <x-nav-link :href="route('gestion.documentos.consulta')" :active="request()->routeIs('gestion.documentos.consulta')" wire:navigate>
                             {{ __('Consultar Documentos Req.') }}
                         </x-nav-link>
                     @endif
                 </div>
             </div>
 
-            <div class="hidden sm:flex sm:items-center sm:ms-6">
+             <div class="hidden sm:flex sm:items-center sm:ms-6">
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
                         <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300 focus:outline-none transition ease-in-out duration-150">
@@ -108,36 +138,56 @@ new class extends Component
         </div>
     </div>
 
+    <!-- Responsive Navigation Menu -->
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1">
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')" wire:navigate>{{ __('Dashboard') }}</x-responsive-nav-link>
+
+            @if(Auth::user() && Auth::user()->hasAnyRole(['ASEM_Admin', 'ASEM_Validator']))
+                <x-responsive-nav-link :href="route('asem.panel-validacion')" :active="request()->routeIs('asem.panel-validacion')" wire:navigate>
+                    {{ __('Panel de Validación') }}
+                </x-responsive-nav-link>
+            @endif
             
             @if(Auth::user() && Auth::user()->hasRole('ASEM_Admin'))
-                 <x-responsive-nav-link :href="route('gestion.listados.hub')"
-                                     :active="request()->routeIs('gestion.listados.hub') || (
-                                                Str::startsWith(Route::currentRouteName(), 'gestion.') &&
-                                                !request()->routeIs('gestion.mandantes') &&
-                                                !request()->routeIs('gestion.contratistas') &&
-                                                !request()->routeIs('gestion.unidades-organizacionales-mandante') &&
-                                                !request()->routeIs('gestion.cargos-mandante') &&
-                                                !request()->routeIs('gestion.documentos.consulta') &&
-                                                !request()->routeIs('gestion.reglas-documentales') &&
-                                                (Route::currentRouteName() !== 'gestion.documentos')
-                                            )"
-                                     wire:navigate>{{ __('Listados Universales') }}</x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('gestion.mandantes')"
-                                     :active="request()->routeIs('gestion.mandantes') || request()->routeIs('gestion.unidades-organizacionales-mandante') || request()->routeIs('gestion.cargos-mandante')"
-                                     wire:navigate>{{ __('Mandantes') }}</x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('gestion.contratistas')" :active="request()->routeIs('gestion.contratistas')" wire:navigate>{{ __('Contratistas ASEM') }}</x-responsive-nav-link>
+                 <x-responsive-nav-link :href="route('gestion.asignacion-documentos')" :active="request()->routeIs('gestion.asignacion-documentos')" wire:navigate>
+                    {{ __('Asignar Documentos') }}
+                </x-responsive-nav-link>
+                
+                {{-- ============================================= --}}
+                {{-- INICIO: NUEVO ENLACE RESPONSIVE --}}
+                {{-- ============================================= --}}
+                <x-responsive-nav-link :href="route('gestion.gestion-general')" :active="request()->routeIs('gestion.gestion-general')" wire:navigate>
+                    {{ __('Gestión General') }}
+                </x-responsive-nav-link>
+                {{-- ============================================= --}}
+                {{-- FIN: NUEVO ENLACE RESPONSIVE --}}
+                {{-- ============================================= --}}
+
+                <x-responsive-nav-link :href="route('gestion.listados.hub')" :active="$this->isListadosUniversalesActive()" wire:navigate>
+                    {{ __('Listados Universales') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('gestion.mandantes')" :active="request()->routeIs('gestion.mandantes')" wire:navigate>
+                    {{ __('Mandantes') }}
+                </x-responsive-nav-link>
+                 <x-responsive-nav-link :href="route('gestion.contratistas')" :active="request()->routeIs('gestion.contratistas')" wire:navigate>
+                    {{ __('Contratistas ASEM') }}
+                </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('gestion.reglas-documentales')" :active="request()->routeIs('gestion.reglas-documentales')" wire:navigate>
                     {{ __('Reglas Documentales') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('gestion.usuarios')" :active="request()->routeIs('gestion.usuarios')" wire:navigate>
+                    {{ __('Usuarios ASEM') }}
                 </x-responsive-nav-link>
             @endif
 
             @if(Auth::user() && Auth::user()->hasRole('Contratista_Admin'))
-                <x-responsive-nav-link :href="route('contratista.mi-ficha')" :active="request()->routeIs('contratista.mi-ficha')" wire:navigate>{{ __('Mi Ficha Empresa') }}</x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('contratista.trabajadores')" :active="request()->routeIs('contratista.trabajadores')" wire:navigate>{{ __('Trabajadores') }}</x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('gestion.documentos.consulta')" :active="request()->routeIs('gestion.documentos.consulta')" wire:navigate>{{ __('Consultar Documentos Req.') }}</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('contratista.panel')" :active="$this->isContratistaPanelActive()" wire:navigate>
+                    {{ __('Panel Operación') }}
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('gestion.documentos.consulta')" :active="request()->routeIs('gestion.documentos.consulta')" wire:navigate>
+                    {{ __('Consultar Documentos Req.') }}
+                </x-responsive-nav-link>
             @endif
         </div>
         <div class="pt-4 pb-1 border-t border-gray-200 dark:border-gray-600">

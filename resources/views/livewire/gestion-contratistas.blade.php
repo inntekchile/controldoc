@@ -20,18 +20,18 @@
         </div>
     @endif
     @if (session()->has('error_uos'))
-        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)"
+        <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 6000)"
             class="mb-4 px-4 py-3 bg-red-100 border border-red-400 text-red-700 rounded-md dark:bg-red-700 dark:text-red-100 dark:border-red-600">
-            {{ session('error_uos') }}
+            <span class="font-bold">Error en Asignación de UOs:</span> {{ session('error_uos') }}
         </div>
     @endif
 
-    @if ($errors->any() && $isOpen) {{-- Errores para el modal de Contratista --}}
+    @if ($isOpen && $errors->any())
         <div class="alert alert-danger bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-            <strong class="font-bold">¡Hay errores de validación! Por favor, revise los campos.</strong>
+            <strong class="font-bold">¡Hay errores de validación! Por favor, revise los campos del formulario del Contratista.</strong>
             <ul class="mt-2 list-disc list-inside text-sm">
                 @foreach ($errors->all() as $error)
-                    @if (!Str::startsWith($error, 'selectedUnidadesConCondicion.')) {{-- No mostrar errores de UOs aquí --}}
+                    @if (!Str::startsWith($error, 'selectedUnidadesConCondicion.'))
                         <li>{{ $error }}</li>
                     @endif
                 @endforeach
@@ -39,26 +39,24 @@
         </div>
     @endif
     
-    @if ($errors->has('selectedUnidadesConCondicion.*') && $showModalAsignarUOs) {{-- Errores para el modal de UOs --}}
+    @if ($showModalAsignarUOs && $errors->has('selectedUnidadesConCondicion.*'))
         <div class="alert alert-danger bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-            <strong class="font-bold">¡Error en la asignación de condiciones!</strong>
+            <strong class="font-bold">¡Error en la asignación de Unidades Organizacionales!</strong>
             <ul class="mt-2 list-disc list-inside text-sm">
-                @foreach ($errors->get('selectedUnidadesConCondicion.*') as $message)
-                    <li>{{ $message[0] }}</li> {{-- Muestra el primer mensaje de error para esa UO/condición --}}
+                @foreach ($errors->get('selectedUnidadesConCondicion.*') as $messages)
+                    @foreach ($messages as $message) <li>{{ $message }}</li> @endforeach
                 @endforeach
             </ul>
             <p class="text-xs mt-1">Asegúrese que las condiciones seleccionadas sean válidas.</p>
         </div>
     @endif
 
-
     <div class="flex flex-col sm:flex-row justify-between items-center mb-4 space-y-2 sm:space-y-0">
         <div class="w-full sm:w-2/5">
             <input wire:model.live.debounce.300ms="search" type="text" placeholder="Buscar por Razón Social, RUT, Fantasía o Admin..."
                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-gray-200">
         </div>
-        <button wire:click="create()"
-                class="btn-primary">
+        <button wire:click="create()" class="btn-primary">
             <x-icons.plus class="h-5 w-5 inline-block mr-1"/>
             Nueva Empresa Contratista
         </button>
@@ -136,8 +134,6 @@
                             </div>
 
                             <div class="space-y-6">
-                                {{-- Fieldsets para Datos de la Empresa, Dirección, Detalles Adicionales, Representante Legal --}}
-                                {{-- (Estos fieldsets no cambian y se mantienen como estaban) --}}
                                 <fieldset class="border border-gray-300 dark:border-gray-600 p-4 rounded-md">
                                     <legend class="text-md font-semibold text-gray-700 dark:text-gray-300 px-2">Datos de la Empresa</legend>
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
@@ -395,15 +391,16 @@
             </div>
         </div>
     @endif
+    {{-- FIN MODAL PARA CREAR/EDITAR CONTRATISTA --}}
 
-    {{-- MODAL PARA ASIGNAR UOs AL CONTRATISTA --}}
+    {{-- MODAL PARA ASIGNAR UOs AL CONTRATISTA (CON LISTA APLANADA) --}}
     @if ($showModalAsignarUOs)
         <div class="fixed z-20 inset-0 overflow-y-auto" aria-labelledby="modal-title-uos" role="dialog" aria-modal="true">
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                 <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity dark:bg-gray-900 dark:bg-opacity-75" aria-hidden="true" wire:click="cerrarModalAsignarUOs()"></div>
                 <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
 
-                <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full"> {{-- Incrementado a max-w-3xl --}}
+                <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-xl sm:w-full">
                     <form wire:submit.prevent="guardarAsignacionUOs">
                         <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6">
                             <div class="sm:flex sm:items-start mb-4">
@@ -432,23 +429,57 @@
                                     @error('selectedMandanteIdParaAsignarUOs') <span class="error-message">{{ $message }}</span> @enderror
                                 </div>
 
+                                {{-- SECCIÓN DE LA LISTA DE UOs (AHORA APLANADA) --}}
                                 @if(!empty($selectedMandanteIdParaAsignarUOs))
-                                    @if($unidadesOrganizacionalesJerarquicas->count() > 0)
-                                        <div class="mt-4 border border-gray-300 dark:border-gray-600 rounded-md p-3 max-h-96 overflow-y-auto"> {{-- Incrementado max-h-96 --}}
-                                            <div class="grid grid-cols-6 gap-x-2 mb-2 sticky top-0 bg-gray-50 dark:bg-gray-700 py-2 px-1 rounded-t-md z-10">
-                                                <div class="col-span-4 font-semibold text-xs text-gray-600 dark:text-gray-300">Unidad Organizacional</div>
-                                                <div class="col-span-2 font-semibold text-xs text-gray-600 dark:text-gray-300">Condición Contratista</div>
+                                    @if(count($unidadesOrganizacionalesAplanadas) > 0) 
+                                        <div class="mt-4 border border-gray-300 dark:border-gray-600 rounded-md p-3 max-h-96 overflow-y-auto">
+                                            <div class="grid grid-cols-12 gap-x-2 mb-2 sticky top-0 bg-gray-100 dark:bg-gray-700 py-2 px-3 -mx-3 -mt-3 rounded-t-md z-10">
+                                                <div class="col-span-7 font-semibold text-xs text-gray-600 dark:text-gray-300 uppercase">Unidad Organizacional</div>
+                                                <div class="col-span-5 font-semibold text-xs text-gray-600 dark:text-gray-300 uppercase">Condición Contratista</div>
                                             </div>
                                             <div class="space-y-1">
-                                                {{-- MODIFICACIÓN CLAVE AQUÍ --}}
-                                                @foreach($unidadesOrganizacionalesJerarquicas as $uoRaiz)
-                                                    <x-jerarquia-uo-item
-                                                        :uo="$uoRaiz"
-                                                        :level="0"
-                                                        :selectedUOsConCondicion="$selectedUnidadesConCondicion"
-                                                        :tiposCondicionDisponibles="$tiposCondicionDisponibles" {{-- Pasar la lista de condiciones --}}
-                                                        wire:key="jerarquia-{{ $uoRaiz->id }}"
-                                                    />
+                                                @foreach($unidadesOrganizacionalesAplanadas as $uoArray)
+                                                    @php
+                                                        $prefixedUoKey = 'uo_' . $uoArray['id'];
+                                                    @endphp
+                                                    <div wire:key="flat-uo-item-{{ $selectedMandanteIdParaAsignarUOs }}-{{ $uoArray['id'] }}" 
+                                                         class="grid grid-cols-12 gap-x-2 items-start py-1 border-b border-gray-200 dark:border-gray-700 last:border-b-0">
+                                                        
+                                                        <div class="col-span-7 flex items-center pt-1" style="padding-left: {{ ($uoArray['level'] ?? 0) * 1.5 }}rem;">
+                                                            <input type="checkbox"
+                                                                   id="uo_cond_sel_{{ $uoArray['id'] }}"
+                                                                   value="{{ $uoArray['id'] }}"
+                                                                   wire:change="$dispatch('toggleUOCondicionEvent', { uoId: {{ $uoArray['id'] }}, isChecked: $event.target.checked })"
+                                                                   class="form-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 mr-2 shrink-0"
+                                                                   {{ array_key_exists($prefixedUoKey, $selectedUnidadesConCondicion ?? []) ? 'checked' : '' }}>
+                                                            <label for="uo_cond_sel_{{ $uoArray['id'] }}" class="text-sm text-gray-800 dark:text-gray-200 truncate" title="{{ $uoArray['nombre_unidad'] }}">
+                                                                {{ $uoArray['nombre_unidad'] }}
+                                                            </label>
+                                                        </div>
+
+                                                        <div class="col-span-5">
+                                                            @if(array_key_exists($prefixedUoKey, $selectedUnidadesConCondicion ?? []))
+                                                                <select wire:change="$dispatch('condicionUoCambiada', { uoId: {{ $uoArray['id'] }}, tipoCondicionId: $event.target.value })"
+                                                                        class="input-field input-field-sm py-1 text-xs 
+                                                                               focus:ring-indigo-500 focus:border-indigo-500
+                                                                               {{ ($selectedUnidadesConCondicion[$prefixedUoKey] ?? null) === null ? 'border-yellow-400 dark:border-yellow-500' : 'border-gray-300 dark:border-gray-600' }}">
+                                                                    <option value="">-- Sin Condición --</option>
+                                                                    @if(isset($tiposCondicionDisponibles))
+                                                                        @foreach($tiposCondicionDisponibles as $condicion)
+                                                                            <option value="{{ $condicion->id }}" {{ ($selectedUnidadesConCondicion[$prefixedUoKey] ?? null) == $condicion->id ? 'selected' : '' }}>
+                                                                                {{ $condicion->nombre }}
+                                                                            </option>
+                                                                        @endforeach
+                                                                    @endif
+                                                                </select>
+                                                                 @error('selectedUnidadesConCondicion.' . $prefixedUoKey) <span class="error-message text-xxs">{{ $message }}</span> @enderror
+                                                            @else
+                                                                <select class="input-field input-field-sm py-1 text-xs border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 cursor-not-allowed" disabled>
+                                                                    <option value="">-- N/A --</option>
+                                                                </select>
+                                                            @endif
+                                                        </div>
+                                                    </div>
                                                 @endforeach
                                             </div>
                                         </div>
@@ -458,8 +489,7 @@
                                 @else
                                      <p class="text-sm text-gray-500 dark:text-gray-400 mt-4">Seleccione un mandante para listar sus Unidades Organizacionales.</p>
                                 @endif
-                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Las UOs seleccionadas (y su condición) de todos los mandantes revisados se guardarán al presionar "Guardar Asignaciones".</p>
-
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Las UOs seleccionadas (junto con su condición) de todos los mandantes revisados se guardarán al presionar "Guardar Asignaciones".</p>
                             </div>
                         </div>
 
@@ -477,38 +507,19 @@
         </div>
     @endif
 
-
     @push('styles')
     <style>
-        /* Las clases CSS personalizadas no cambian, se mantienen como estaban */
-        .label-form {
-            @apply block text-sm font-medium text-gray-700 dark:text-gray-300;
-        }
-        .input-field {
-            @apply mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-gray-200;
-        }
-        .input-error {
-            @apply border-red-500 dark:border-red-500;
-        }
-        .error-message {
-            @apply text-red-500 text-xs mt-1;
-        }
-        .form-checkbox {
-            @apply h-4 w-4 text-indigo-600 border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500 dark:bg-gray-700 dark:focus:ring-indigo-600 dark:ring-offset-gray-800;
-        }
-        .btn-primary {
-            @apply px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150;
-        }
-        .btn-secondary {
-            @apply px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150;
-        }
-        .action-button-edit {
-            @apply text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200 mr-2;
-        }
-        .action-button-link { 
-            @apply text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200;
-        }
-
+        .label-form { @apply block text-sm font-medium text-gray-700 dark:text-gray-300; }
+        .input-field { @apply mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm dark:bg-gray-700 dark:text-gray-200; }
+        .input-field-sm { @apply text-xs px-2 py-1; }
+        .input-error { @apply border-red-500 dark:border-red-500; }
+        .error-message { @apply text-red-500 text-xs mt-1; }
+        .text-xxs { font-size: 0.65rem; line-height: 0.85rem; }
+        .form-checkbox { @apply h-4 w-4 text-indigo-600 border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500 dark:bg-gray-700 dark:focus:ring-indigo-600 dark:ring-offset-gray-800; }
+        .btn-primary { @apply px-4 py-2 bg-indigo-600 text-white font-semibold rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150; }
+        .btn-secondary { @apply px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-semibold rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150; }
+        .action-button-edit { @apply text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200 mr-2; }
+        .action-button-link {  @apply text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-200; }
     </style>
     @endpush
 </div>

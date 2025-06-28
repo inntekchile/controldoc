@@ -128,6 +128,7 @@
                                                 {{ $mandanteActual && $mandanteActual->id ? 'Editar Empresa Mandante' : 'Crear Nueva Empresa Mandante' }}
                                             </h3>
                                             <div class="mt-4 grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:gap-x-4">
+                                                {{-- Campos existentes --}}
                                                 <div class="sm:col-span-2">
                                                     <label for="razon_social_mandante_modal" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Razón Social</label>
                                                     <input type="text" wire:model.defer="razon_social" id="razon_social_mandante_modal" class="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500">
@@ -153,7 +154,34 @@
                                                     <input type="text" wire:model.defer="persona_contacto_telefono" id="persona_contacto_telefono_modal" class="mt-1 block w-full shadow-sm sm:text-sm border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500">
                                                     @error('persona_contacto_telefono') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
                                                 </div>
-                                                <div class="sm:col-span-2">
+
+                                                {{-- SECCIÓN DE TIPOS DE ENTIDAD CONTROLABLE --}}
+                                                <div class="sm:col-span-2 mt-4">
+                                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                                        Tipos de Entidad Controlable Permitidos
+                                                    </label>
+                                                    <div class="space-y-2 max-h-40 overflow-y-auto p-2 border border-gray-300 dark:border-gray-600 rounded-md">
+                                                        @if($todosLosTiposEntidad && $todosLosTiposEntidad->count() > 0)
+                                                            @foreach ($todosLosTiposEntidad as $tipoEntidad)
+                                                                <label for="tipo_entidad_{{ $tipoEntidad->id }}" class="flex items-center">
+                                                                    <input type="checkbox"
+                                                                           id="tipo_entidad_{{ $tipoEntidad->id }}"
+                                                                           wire:model.defer="selectedTiposEntidad"
+                                                                           value="{{ $tipoEntidad->id }}"
+                                                                           class="rounded border-gray-300 dark:border-gray-600 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-indigo-400">
+                                                                    <span class="ms-2 text-sm text-gray-600 dark:text-gray-400">{{ $tipoEntidad->nombre_entidad }}</span>
+                                                                </label>
+                                                            @endforeach
+                                                        @else
+                                                            <p class="text-sm text-gray-500 dark:text-gray-400">No hay tipos de entidad controlable activos para seleccionar.</p>
+                                                        @endif
+                                                    </div>
+                                                    @error('selectedTiposEntidad') <span class="text-red-500 text-xs">{{ $message }}</span> @enderror
+                                                    @error('selectedTiposEntidad.*') <span class="text-red-500 text-xs">Uno o más tipos de entidad seleccionados no son válidos.</span> @enderror
+                                                </div>
+                                                {{-- FIN SECCIÓN TIPOS DE ENTIDAD --}}
+
+                                                <div class="sm:col-span-2 mt-2"> {{-- Ajustado el mt para mejor espaciado después de los checkboxes --}}
                                                     <label for="is_active_mandante_modal" class="flex items-center">
                                                         <input type="checkbox" wire:model.defer="is_active" id="is_active_mandante_modal" class="rounded border-gray-300 dark:border-gray-600 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-indigo-400">
                                                         <span class="ms-2 text-sm text-gray-600 dark:text-gray-400">Activo</span>

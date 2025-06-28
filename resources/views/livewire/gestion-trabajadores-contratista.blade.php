@@ -1,29 +1,9 @@
 <div>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
-            @if ($vistaActual === 'listado_trabajadores')
-                {{ __('Gestión de Trabajadores') }}
-                @if($selectedUnidadOrganizacionalId && $nombreVinculacionSeleccionada)
-                    <span class="text-base font-normal text-gray-500 dark:text-gray-400">
-                        (Operando en: {{ $nombreVinculacionSeleccionada }})
-                    </span>
-                @endif
-            @elseif ($vistaActual === 'listado_vinculaciones' && $trabajadorSeleccionado)
-                {{ __('Vinculaciones de: ') . $trabajadorSeleccionado->nombre_completo }}
-                 @if($selectedUnidadOrganizacionalId && $nombreVinculacionSeleccionada)
-                    <span class="text-base font-normal text-gray-500 dark:text-gray-400">
-                        (Contexto: {{ $nombreVinculacionSeleccionada }})
-                    </span>
-                @endif
-            @else
-                {{ __('Gestión de Trabajadores') }}
-            @endif
-        </h2>
-    </x-slot>
+    {{-- El slot name="header" ya no es necesario aquí, se maneja en PanelOperacion --}}
 
-    <div class="py-12">
-        <div class="max-w-full mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-xl sm:rounded-lg p-6">
+    <div class="py-0"> {{-- Padding reducido, el PanelOperacion puede manejar el padding general --}}
+        <div class="max-w-full mx-auto"> {{-- Sin sm:px-6 lg:px-8 --}}
+            <div class="bg-transparent dark:bg-transparent overflow-hidden"> {{-- Sin shadow-xl sm:rounded-lg p-6, ni color de fondo --}}
 
                 {{-- Mensajes Flash Unificados --}}
                 @if (session()->has('message_trabajador') || session()->has('success') || session()->has('message_vinculacion'))
@@ -37,34 +17,9 @@
                     </div>
                 @endif
 
-                {{-- NUEVO: Selector de Vinculación (Mandante - UO) --}}
-                <div class="mb-6 p-4 border dark:border-gray-700 rounded-md bg-gray-50 dark:bg-gray-750">
-                    <label for="selectedUnidadOrganizacionalId" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                        Seleccione la Vinculación (Mandante - Unidad Organizacional) para operar:
-                    </label>
-                    <select wire:model.live="selectedUnidadOrganizacionalId" id="selectedUnidadOrganizacionalId" 
-                            class="input-field w-full sm:w-1/2 lg:w-1/3 @error('selectedUnidadOrganizacionalId') border-red-500 @enderror">
-                        <option value="">-- Seleccione una opción --</option>
-                        @if($unidadesHabilitadasContratista && $unidadesHabilitadasContratista->isNotEmpty())
-                            @foreach ($unidadesHabilitadasContratista as $uo)
-                                <option value="{{ $uo['id'] }}">{{ $uo['nombre_completo'] }}</option>
-                            @endforeach
-                        @else
-                            <option value="" disabled>No tiene Unidades Organizacionales asignadas.</option>
-                        @endif
-                    </select>
-                    @error('selectedUnidadOrganizacionalId') <span class="error-message">{{ $message }}</span> @enderror
-                     @if($unidadesHabilitadasContratista && $unidadesHabilitadasContratista->isEmpty())
-                         <p class="mt-2 text-sm text-yellow-600 dark:text-yellow-400">
-                             No tiene Unidades Organizacionales asignadas por ASEM. Póngase en contacto con el administrador de la plataforma.
-                         </p>
-                     @endif
-                </div>
-                {{-- FIN NUEVO: Selector de Vinculación --}}
-
                 {{-- VISTA: LISTADO DE TRABAJADORES --}}
                 @if ($vistaActual === 'listado_trabajadores')
-                    @if ($selectedUnidadOrganizacionalId) {{-- Solo mostrar si se ha seleccionado UO --}}
+                    @if ($unidadOrganizacionalId)
                         <div class="mb-4 flex flex-col sm:flex-row justify-between items-center">
                             <div class="w-full sm:w-2/3 mb-2 sm:mb-0">
                                 <input wire:model.live.debounce.300ms="searchTrabajador" type="text"
@@ -80,13 +35,13 @@
                             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                                 <thead class="bg-gray-50 dark:bg-gray-700">
                                     <tr>
-                                        <th wire:click="sortBy('id')" class="table-header cursor-pointer">ID <x-sort-icon field="id" :sortField="$sortByTrabajador" :sortDirection="$sortDirectionTrabajador" /></th>
-                                        <th wire:click="sortBy('rut')" class="table-header cursor-pointer">RUT <x-sort-icon field="rut" :sortField="$sortByTrabajador" :sortDirection="$sortDirectionTrabajador" /></th>
-                                        <th wire:click="sortBy('apellido_paterno')" class="table-header cursor-pointer">Trabajador <x-sort-icon field="apellido_paterno" :sortField="$sortByTrabajador" :sortDirection="$sortDirectionTrabajador" /></th>
-                                        <th class="table-header">Cargo Actual (Principal en UO)</th>
+                                        <th wire:click="sortBy('trabajadores.id')" class="table-header cursor-pointer">ID <x-sort-icon field="trabajadores.id" :sortField="$sortByTrabajador" :sortDirection="$sortDirectionTrabajador" /></th>
+                                        <th wire:click="sortBy('trabajadores.rut')" class="table-header cursor-pointer">RUT <x-sort-icon field="trabajadores.rut" :sortField="$sortByTrabajador" :sortDirection="$sortDirectionTrabajador" /></th>
+                                        <th wire:click="sortBy('trabajadores.apellido_paterno')" class="table-header cursor-pointer">Trabajador <x-sort-icon field="trabajadores.apellido_paterno" :sortField="$sortByTrabajador" :sortDirection="$sortDirectionTrabajador" /></th>
+                                        <th class="table-header">Cargo Actual (En UO Sel.)</th>
                                         <th class="table-header text-center">% Cumplimiento</th>
                                         <th class="table-header text-center">Acceso Habilitado</th>
-                                        <th wire:click="sortBy('is_active')" class="table-header text-center cursor-pointer">Estado Ficha <x-sort-icon field="is_active" :sortField="$sortByTrabajador" :sortDirection="$sortDirectionTrabajador" /></th>
+                                        <th wire:click="sortBy('trabajadores.is_active')" class="table-header text-center cursor-pointer">Estado Ficha <x-sort-icon field="trabajadores.is_active" :sortField="$sortByTrabajador" :sortDirection="$sortDirectionTrabajador" /></th>
                                         <th class="table-header text-center">Acciones</th>
                                     </tr>
                                 </thead>
@@ -98,14 +53,9 @@
                                             <td class="table-cell">{{ $trab->apellido_paterno }} {{ $trab->apellido_materno }}, {{ $trab->nombres }}</td>
                                             <td class="table-cell">
                                                 @php
-                                                    // Cargo principal del trabajador DENTRO DE LA UO SELECCIONADA
-                                                    $vinculacionEnUOSeleccionada = $trab->vinculaciones()
-                                                        ->where('unidad_organizacional_mandante_id', $selectedUnidadOrganizacionalId)
-                                                        ->where('is_active', true)
-                                                        ->orderBy('fecha_ingreso_vinculacion', 'desc')
-                                                        ->first();
+                                                    $vinculacionEnUOSeleccionada = $trab->vinculaciones->first();
                                                 @endphp
-                                                {{ $vinculacionEnUOSeleccionada && $vinculacionEnUOSeleccionada->cargoMandante ? $vinculacionEnUOSeleccionada->cargoMandante->nombre_cargo : 'Sin cargo en esta UO' }}
+                                                {{ $vinculacionEnUOSeleccionada && $vinculacionEnUOSeleccionada->cargoMandante ? $vinculacionEnUOSeleccionada->cargoMandante->nombre_cargo : 'N/A' }}
                                             </td>
                                             <td class="table-cell text-center text-sm">N/D</td>
                                             <td class="table-cell text-center text-sm">N/D</td>
@@ -117,16 +67,27 @@
                                             </td>
                                             <td class="table-cell text-center whitespace-nowrap">
                                                 <button wire:click="abrirModalEditarTrabajador({{ $trab->id }})" class="action-button-edit" title="Editar Ficha Trabajador"><x-icons.edit class="inline-block"/></button>
+                                                
+                                                <button 
+                                                    wire:click="eliminarTrabajador({{ $trab->id }})"
+                                                    wire:confirm="¿Estás seguro de eliminar este trabajador?\n\nEsta acción eliminará PERMANENTEMENTE la ficha del trabajador y TODAS sus vinculaciones asociadas. No se puede deshacer."
+                                                    class="action-button-delete" title="Eliminar Trabajador">
+                                                    <x-icons.trash class="inline-block"/>
+                                                </button>
+                                                
                                                 <button wire:click="seleccionarTrabajadorParaVinculaciones({{ $trab->id }})" class="action-button-link" title="Ver/Gestionar Vinculaciones"><x-icons.link class="inline-block"/></button>
+                                                <button wire:click="abrirModalDocumentosTrabajador({{ $trab->id }})" class="action-button-neutral" title="Ver/Gestionar Documentos">
+                                                    <x-icons.clipboard-list class="inline-block"/>
+                                                </button>
                                             </td>
                                         </tr>
                                     @empty
                                         <tr>
                                             <td colspan="8" class="table-cell text-center">
-                                                 @if($selectedUnidadOrganizacionalId)
+                                                 @if($unidadOrganizacionalId)
                                                      No se encontraron trabajadores vinculados a esta Unidad Organizacional. Puede agregar uno nuevo.
                                                  @else
-                                                     Seleccione una Vinculación (Mandante - UO) para ver los trabajadores.
+                                                     Error: El contexto de operación (Mandante - UO) no ha sido establecido.
                                                  @endif
                                             </td>
                                         </tr>
@@ -141,7 +102,7 @@
                         @endif
                      @else
                          <div class="p-4 text-center text-gray-500 dark:text-gray-400">
-                             Por favor, seleccione una Vinculación (Mandante - Unidad Organizacional) en el desplegable de arriba para comenzar a gestionar los trabajadores.
+                             Error: El contexto de operación (Mandante - Unidad Organizacional) no está definido. Por favor, regrese al Panel de Operación y seleccione una vinculación.
                          </div>
                     @endif
                 @endif
@@ -159,7 +120,7 @@
 
                     <div class="mb-4 flex flex-col sm:flex-row justify-between items-center">
                         <button wire:click="irAListadoTrabajadores" class="btn-secondary mb-2 sm:mb-0"> 
-                            <x-icons.arrow-left class="w-5 h-5 mr-1 inline-block"/> Volver a Listado Trabajadores ({{ $nombreVinculacionSeleccionada }})
+                            <x-icons.arrow-left class="w-5 h-5 mr-1 inline-block"/> Volver a Listado Trabajadores @if($nombreVinculacionSeleccionada) ({{ $nombreVinculacionSeleccionada }}) @endif
                         </button>
                         <button wire:click="abrirModalNuevaVinculacion" class="btn-primary">
                             <x-icons.plus class="w-5 h-5 mr-1 inline-block"/> Agregar Vinculación / Contractual
@@ -218,8 +179,7 @@
 
                 {{-- MODAL: FICHA DEL TRABAJADOR --}}
                 @if ($showModalFichaTrabajador)
-                    <div class="fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title-trabajador" role="dialog" aria-modal="true">
-                        {{-- Contenido del modal como lo tenías, no hay cambios aquí --}}
+                     <div class="fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title-trabajador" role="dialog" aria-modal="true">
                         <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                          <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity dark:bg-gray-900 dark:bg-opacity-75" aria-hidden="true" wire:click="cerrarModalFichaTrabajador"></div>
                          <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
@@ -233,7 +193,7 @@
                                                  @if($trabajadorSeleccionado && $trabajadorId)
                                                      <span class="text-sm font-normal text-gray-500 dark:text-gray-400">- {{ $trabajadorSeleccionado->nombre_completo }}</span>
                                                  @endif
-                                                 @if($selectedUnidadOrganizacionalId && $nombreVinculacionSeleccionada)
+                                                 @if($unidadOrganizacionalId && $nombreVinculacionSeleccionada)
                                                      <p class="text-xs font-normal text-gray-500 dark:text-gray-400">
                                                          Contexto: {{ $nombreVinculacionSeleccionada }}
                                                      </p>
@@ -320,32 +280,32 @@
                                                      </div>
                                                      <div class="lg:col-span-4 section-title !border-none !pb-0">Domicilio del Trabajador</div>
                                                      <div>
-                                                         <label for="direccion_calle" class="label-form">Calle</label>
-                                                         <input type="text" wire:model.lazy="direccion_calle" id="direccion_calle" class="input-field w-full">
+                                                         <label for="direccion_calle_trab" class="label-form">Calle</label>
+                                                         <input type="text" wire:model.lazy="direccion_calle" id="direccion_calle_trab" class="input-field w-full">
                                                          @error('direccion_calle') <span class="error-message">{{ $message }}</span> @enderror
                                                      </div>
                                                      <div>
-                                                         <label for="direccion_numero" class="label-form">Número</label>
-                                                         <input type="text" wire:model.lazy="direccion_numero" id="direccion_numero" class="input-field w-full">
+                                                         <label for="direccion_numero_trab" class="label-form">Número</label>
+                                                         <input type="text" wire:model.lazy="direccion_numero" id="direccion_numero_trab" class="input-field w-full">
                                                          @error('direccion_numero') <span class="error-message">{{ $message }}</span> @enderror
                                                      </div>
                                                      <div>
-                                                         <label for="direccion_departamento" class="label-form">Depto / Casa</label>
-                                                         <input type="text" wire:model.lazy="direccion_departamento" id="direccion_departamento" class="input-field w-full">
+                                                         <label for="direccion_departamento_trab" class="label-form">Depto / Casa</label>
+                                                         <input type="text" wire:model.lazy="direccion_departamento" id="direccion_departamento_trab" class="input-field w-full">
                                                          @error('direccion_departamento') <span class="error-message">{{ $message }}</span> @enderror
                                                      </div>
                                                      <div> </div> 
                                                      <div>
-                                                         <label for="trabajador_region_id" class="label-form">Región</label>
-                                                         <select wire:model.live="trabajador_region_id" id="trabajador_region_id" class="input-field w-full">
+                                                         <label for="trabajador_region_id_modal" class="label-form">Región</label>
+                                                         <select wire:model.live="trabajador_region_id" id="trabajador_region_id_modal" class="input-field w-full">
                                                              <option value="">Seleccione Región...</option>
                                                              @foreach($regiones as $region) <option value="{{ $region->id }}">{{ $region->nombre }}</option> @endforeach
                                                          </select>
                                                          @error('trabajador_region_id') <span class="error-message">{{ $message }}</span> @enderror
                                                      </div>
                                                      <div>
-                                                         <label for="trabajador_comuna_id" class="label-form">Comuna</label>
-                                                         <select wire:model="trabajador_comuna_id" id="trabajador_comuna_id" class="input-field w-full" @if(empty($comunasDisponiblesTrabajador)) disabled @endif>
+                                                         <label for="trabajador_comuna_id_modal" class="label-form">Comuna</label>
+                                                         <select wire:model="trabajador_comuna_id" id="trabajador_comuna_id_modal" class="input-field w-full" @if(empty($comunasDisponiblesTrabajador)) disabled @endif>
                                                              <option value="">Seleccione Comuna...</option>
                                                              @foreach($comunasDisponiblesTrabajador as $comuna) <option value="{{ $comuna->id }}">{{ $comuna->nombre }}</option> @endforeach
                                                          </select>
@@ -358,8 +318,8 @@
                                                          @error('fecha_ingreso_empresa') <span class="error-message">{{ $message }}</span> @enderror
                                                      </div>
                                                      <div class="lg:col-span-3">
-                                                         <label for="trabajador_is_active" class="label-form flex items-center mt-2">
-                                                             <input type="checkbox" wire:model="trabajador_is_active" id="trabajador_is_active" class="form-checkbox rounded border-gray-300 dark:border-gray-600 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-indigo-400">
+                                                         <label for="trabajador_is_active_modal" class="label-form flex items-center mt-2">
+                                                             <input type="checkbox" wire:model="trabajador_is_active" id="trabajador_is_active_modal" class="form-checkbox rounded border-gray-300 dark:border-gray-600 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 dark:bg-gray-700 dark:text-indigo-400">
                                                              <span class="ms-2 text-sm text-gray-600 dark:text-gray-400">Trabajador Activo</span>
                                                          </label>
                                                      </div>
@@ -385,13 +345,12 @@
                 {{-- MODAL: VINCULACIÓN --}}
                 @if($showModalVinculacion && $trabajadorSeleccionado)
                     <div class="fixed z-20 inset-0 overflow-y-auto" aria-labelledby="modal-title-vinculacion" role="dialog" aria-modal="true">
-                        {{-- Contenido del modal como lo tenías, no hay cambios aquí --}}
                         <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                          <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity dark:bg-gray-900 dark:bg-opacity-75" aria-hidden="true" wire:click="cerrarModalVinculacion"></div>
                          <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
                          <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-3xl sm:w-full">
                              <form wire:submit.prevent="guardarVinculacion" id="formVinculacion">
-                                 <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                                <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                                      <div class="sm:flex sm:items-start w-full">
                                          <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
                                              <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-gray-100 section-title" id="modal-title-vinculacion">
@@ -399,14 +358,14 @@
                                                  <p class="text-sm font-normal text-gray-500 dark:text-gray-400">
                                                      Para: {{ $trabajadorSeleccionado->nombre_completo }}
                                                  </p>
-                                                  @if($selectedUnidadOrganizacionalId && $nombreVinculacionSeleccionada && $vistaActual === 'listado_vinculaciones')
+                                                 @if($unidadOrganizacionalId && $nombreVinculacionSeleccionada && $vistaActual === 'listado_vinculaciones')
                                                      <p class="text-xs font-normal text-gray-500 dark:text-gray-400">
                                                          Contexto Principal: {{ $nombreVinculacionSeleccionada }}
                                                      </p>
                                                  @endif
                                              </h3>
                                              <div class="mt-4 space-y-4">
-                                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                      <div>
                                                          <label for="v_mandante_id" class="label-form">Seleccione Mandante <span class="text-red-500">*</span></label>
                                                          <select wire:model.live="v_mandante_id" id="v_mandante_id" class="input-field w-full">
@@ -500,7 +459,222 @@
                      </div>
                     </div>
                 @endif
+                
+                {{-- MODAL PARA GESTIONAR DOCUMENTOS TRABAJADOR --}}
+                @if ($showModalDocumentosTrabajador && $trabajadorParaDocumentos)
+                    <div class="fixed z-30 inset-0 overflow-y-auto" aria-labelledby="modal-title-documentos" role="dialog" aria-modal="true" x-data="{ openInfo: null }">
+                        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity dark:bg-gray-900 dark:bg-opacity-75" aria-hidden="true" wire:click="cerrarModalDocumentosTrabajador"></div>
+                            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">​</span>
+                            <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-7xl sm:w-full">
+                                <form wire:submit.prevent="cargarDocumentos">
+                                    <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6">
+                                        <div class="sm:flex sm:items-start">
+                                            <div class="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                                                <h3 class="text-xl leading-6 font-medium text-gray-900 dark:text-gray-100 section-title mb-1" id="modal-title-documentos">
+                                                    Documentos Requeridos para: <span class="font-semibold">{{ $nombreTrabajadorParaDocumentosModal }}</span>
+                                                </h3>
+                                                <p class="text-sm text-gray-500 dark:text-gray-400">RUT: {{ $trabajadorParaDocumentos->rut }}</p>
+                                                <p class="text-sm text-gray-500 dark:text-gray-400">
+                                                    Contexto: {{ $nombreVinculacionSeleccionada }}
+                                                    @if($vinculacionActivaEnUOContexto)
+                                                        (Cargo: {{ $vinculacionActivaEnUOContexto->cargoMandante?->nombre_cargo ?? 'N/A' }})
+                                                    @else
+                                                        (Sin vinculación activa en esta UO)
+                                                    @endif
+                                                </p>
+                                                
+                                                @if (session()->has('info_modal_documentos'))
+                                                    <div class="alert-info mt-4">
+                                                        {{ session('info_modal_documentos') }}
+                                                    </div>
+                                                @endif
+                                                @if (session()->has('error_modal_documentos'))
+                                                    <div class="alert-danger mt-4">
+                                                        {{ session('error_modal_documentos') }}
+                                                    </div>
+                                                @endif
 
+                                                <div class="mt-6 overflow-x-auto shadow-md sm:rounded-lg">
+                                                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                                        <thead class="bg-gray-50 dark:bg-gray-700">
+                                                            <tr>
+                                                                <th class="table-header-sm px-2">N°</th>
+                                                                <th class="table-header-sm">Documento</th>
+                                                                <th class="table-header-sm text-center">Afecta % / Restr. Acc.</th>
+                                                                <th class="table-header-sm">Estado Actual</th>
+                                                                <th class="table-header-sm">F. Emisión</th>
+                                                                <th class="table-header-sm">F. Vencimiento</th>
+                                                                <th class="table-header-sm">Período</th>
+                                                                <th class="table-header-sm">Cargar Nuevo Archivo</th>
+                                                                <th class="table-header-sm text-center">Opc.</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                                            @forelse ($documentosRequeridosParaTrabajador as $index => $doc)
+                                                                @php
+                                                                    $reglaId = $doc['regla_documental_id_origen'];
+                                                                    $estado = $doc['estado_actual_documento'];
+                                                                    $colorClass = 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+                                                                    if ($estado === 'No Cargado') { $colorClass = 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-100'; }
+                                                                    if ($estado === 'Vigente' || $estado === 'Aprobado') { $colorClass = 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100'; }
+                                                                    if ($estado === 'Vencido' || $estado === 'Rechazado') { $colorClass = 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100'; }
+                                                                    if ($estado === 'Pendiente Validación' || $estado === 'En Revisión') { $colorClass = 'bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100'; }
+                                                                @endphp
+                                                                <tr class="table-row-hover text-sm">
+                                                                    <td class="table-cell-sm px-2">{{ $loop->iteration }}</td>
+                                                                    <td class="table-cell-sm font-medium">
+                                                                        {{ $doc['nombre_documento_texto'] }}
+                                                                        @if($doc['observacion_documento_texto'])
+                                                                            <span class="block text-xs text-gray-500 dark:text-gray-400 italic">{{ Str::limit($doc['observacion_documento_texto'], 70) }}</span>
+                                                                        @endif
+                                                                    </td>
+                                                                    <td class="table-cell-sm text-center">
+                                                                        <div class="flex justify-center items-center space-x-1">
+                                                                            <span title="Afecta % Cumplimiento">
+                                                                                @if($doc['afecta_cumplimiento']) <x-icons.check-circle class="text-green-500 w-4 h-4"/> @else <x-icons.x-circle class="text-red-500 w-4 h-4"/> @endif
+                                                                            </span>
+                                                                            <span title="Restringe Acceso">
+                                                                                @if($doc['restringe_acceso']) <x-icons.ban class="text-orange-500 w-4 h-4"/> @else <x-icons.check-circle class="text-green-500 w-4 h-4"/> @endif
+                                                                            </span>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td class="table-cell-sm">
+                                                                        <div class="flex items-center space-x-2">
+                                                                            <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full {{ $colorClass }}">
+                                                                                {{ $doc['estado_actual_documento'] }}
+                                                                            </span>
+                                                                            {{-- BOTÓN ELIMINAR RESTAURADO --}}
+                                                                            @if($doc['archivo_cargado'] && $doc['estado_actual_documento'] === 'Pendiente Validación')
+                                                                                <button
+                                                                                    type="button"
+                                                                                    wire:click="eliminarDocumentoCargado({{ $doc['archivo_cargado']->id }})"
+                                                                                    wire:confirm="¿Está seguro de eliminar este documento pendiente? Esta acción es irreversible."
+                                                                                    class="text-red-500 hover:text-red-700"
+                                                                                    title="Eliminar documento pendiente">
+                                                                                    <x-icons.trash class="w-4 h-4" />
+                                                                                </button>
+                                                                            @endif
+                                                                        </div>
+                                                                        @if($doc['archivo_cargado'])
+                                                                            <a href="{{ Storage::url($doc['archivo_cargado']->ruta_archivo) }}" target="_blank" class="text-xs text-blue-500 hover:text-blue-700 block mt-1" title="{{ $doc['archivo_cargado']->nombre_original_archivo }}">
+                                                                                Ver Archivo Actual
+                                                                            </a>
+                                                                        @endif
+                                                                    </td>
+                                                                    <td class="table-cell-sm">
+                                                                        @if ($doc['archivo_cargado'] && $doc['archivo_cargado']->fecha_emision)
+                                                                            <span class="text-gray-900 dark:text-gray-200 p-1 block">{{ $doc['archivo_cargado']->fecha_emision->format('d-m-Y') }}</span>
+                                                                        @elseif ($doc['valida_emision'] || $doc['tipo_vencimiento_nombre'] === 'DESDE EMISION')
+                                                                            <input type="date" class="input-field-sm w-full py-1" wire:model.defer="documentosParaCargar.{{ $reglaId }}.fecha_emision_input">
+                                                                        @else
+                                                                            <span class="text-gray-400">N/A</span>
+                                                                        @endif
+                                                                    </td>
+                                                                    <td class="table-cell-sm">
+                                                                        @if ($doc['archivo_cargado'] && $doc['archivo_cargado']->fecha_vencimiento)
+                                                                             <span class="text-gray-900 dark:text-gray-200 p-1 block">{{ $doc['archivo_cargado']->fecha_vencimiento->format('d-m-Y') }}</span>
+                                                                        @elseif ($doc['valida_vencimiento'] || $doc['tipo_vencimiento_nombre'] === 'FIJO')
+                                                                            <input type="date" class="input-field-sm w-full py-1" wire:model.defer="documentosParaCargar.{{ $reglaId }}.fecha_vencimiento_input">
+                                                                        @elseif ($doc['tipo_vencimiento_nombre'] === 'INDEFINIDO')
+                                                                            <span class="text-gray-400">Indefinido</span>
+                                                                        @else
+                                                                            <span class="text-gray-400">N/A</span>
+                                                                        @endif
+                                                                    </td>
+                                                                    <td class="table-cell-sm">
+                                                                        @if ($doc['archivo_cargado'] && $doc['archivo_cargado']->periodo)
+                                                                            <span class="text-gray-900 dark:text-gray-200 p-1 block">{{ \Carbon\Carbon::createFromFormat('Y-m', $doc['archivo_cargado']->periodo)->translatedFormat('F Y') }}</span>
+                                                                        @elseif ($doc['tipo_vencimiento_nombre'] === 'PERIODO')
+                                                                            <input type="month" class="input-field-sm w-full py-1" wire:model.defer="documentosParaCargar.{{ $reglaId }}.periodo_input" placeholder="YYYY-MM">
+                                                                        @else
+                                                                            <span class="text-gray-400">N/A</span>
+                                                                        @endif
+                                                                    </td>
+                                                                    <td class="table-cell-sm">
+                                                                        <input type="file" class="input-file-sm w-full text-xs" wire:model="documentosParaCargar.{{ $reglaId }}.archivo_input">
+                                                                        <div wire:loading wire:target="documentosParaCargar.{{ $reglaId }}.archivo_input" class="text-xs text-blue-500 mt-1">Cargando...</div>
+                                                                    </td>
+                                                                    <td class="table-cell-sm text-center">
+                                                                        <div class="relative inline-block text-left">
+                                                                            <button @click="openInfo === {{ $index }} ? openInfo = null : openInfo = {{ $index }}" type="button" class="action-button-info p-1" title="Más Información">
+                                                                                <x-icons.information-circle class="w-5 h-5"/>
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                                @if(isset($uploadSuccess[$reglaId]) || $errors->has('documentosParaCargar.' . $reglaId . '.archivo_input'))
+                                                                    <tr class="text-xs">
+                                                                        <td colspan="9" class="p-1 px-4">
+                                                                            @if(isset($uploadSuccess[$reglaId]))
+                                                                                <span class="text-green-600 dark:text-green-400 font-semibold flex items-center">
+                                                                                    <x-icons.check-circle-solid class="w-4 h-4 mr-1"/> {{ $uploadSuccess[$reglaId] }}
+                                                                                </span>
+                                                                            @endif
+                                                                            @error('documentosParaCargar.' . $reglaId . '.archivo_input')
+                                                                                <span class="text-red-600 dark:text-red-400 font-semibold flex items-center">
+                                                                                    <x-icons.x-circle-solid class="w-4 h-4 mr-1"/> {{ $message }}
+                                                                                </span>
+                                                                            @enderror
+                                                                        </td>
+                                                                    </tr>
+                                                                @endif
+
+                                                                <tr x-show="openInfo === {{ $index }}" x-transition>
+                                                                    <td colspan="9" class="p-3 bg-gray-100 dark:bg-gray-700 text-xs">
+                                                                        <h4 class="font-semibold mb-1">Criterios de Evaluación para: {{ $doc['nombre_documento_texto'] }}</h4>
+                                                                        @if (!empty($doc['criterios_evaluacion']))
+                                                                            <ul class="list-disc ml-5 space-y-1">
+                                                                                @foreach($doc['criterios_evaluacion'] as $criterioItem)
+                                                                                    <li>
+                                                                                        <strong>Criterio:</strong> {{ $criterioItem['criterio'] ?? 'N/A' }}
+                                                                                        @if($criterioItem['sub_criterio']) | <strong>Sub-Criterio:</strong> {{ $criterioItem['sub_criterio'] }} @endif
+                                                                                        @if($criterioItem['texto_rechazo']) <br><span class="text-red-600 dark:text-red-400">Posible Rechazo: {{ $criterioItem['texto_rechazo'] }}</span> @endif
+                                                                                        @if($criterioItem['aclaracion']) <br><span class="text-blue-600 dark:text-blue-400">Aclaración: {{ $criterioItem['aclaracion'] }}</span> @endif
+                                                                                    </li>
+                                                                                @endforeach
+                                                                            </ul>
+                                                                        @else
+                                                                            <p>No hay criterios de evaluación específicos definidos para este documento.</p>
+                                                                        @endif
+                                                                         @if($doc['observacion_documento_texto'])
+                                                                            <h4 class="font-semibold mt-2 mb-1">Observación General del Documento:</h4>
+                                                                            <p>{{ $doc['observacion_documento_texto'] }}</p>
+                                                                        @endif
+                                                                    </td>
+                                                                </tr>
+                                                            @empty
+                                                                <tr>
+                                                                    <td colspan="9" class="table-cell text-center p-4">
+                                                                        No se encontraron documentos requeridos para este trabajador bajo los filtros actuales, o no tiene una vinculación activa que permita determinar los documentos.
+                                                                    </td>
+                                                                </tr>
+                                                            @endforelse
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="bg-gray-50 dark:bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                                        <button type="submit" class="btn-primary sm:ms-3" wire:loading.attr="disabled" wire:target="cargarDocumentos">
+                                            <span wire:loading.remove wire:target="cargarDocumentos">
+                                                <x-icons.upload class="w-5 h-5 mr-1 inline-block"/> Cargar Documentos Seleccionados
+                                            </span>
+                                            <span wire:loading wire:target="cargarDocumentos">
+                                                <x-icons.spinner class="w-5 h-5 mr-1 inline-block"/> Procesando...
+                                            </span>
+                                        </button>
+                                        <button type="button" wire:click="cerrarModalDocumentosTrabajador" class="btn-secondary">
+                                            Cerrar
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+                
             </div>
         </div>
     </div>
