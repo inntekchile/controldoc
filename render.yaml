@@ -70,33 +70,40 @@ envVarGroups:
         fromDatabase:
           name: inntek-db
           property: host
+        value: controldoc
       - key: DB_PORT
         fromDatabase:
           name: inntek-db
           property: port
+        value: 3600
       - key: DB_DATABASE
         fromDatabase:
           name: inntek-db
           property: database
+        value: controldoc
       - key: DB_USERNAME
         fromDatabase:
           name: inntek-db
           property: user
+        value: controldoc
       - key: DB_PASSWORD
         fromDatabase:
           name: inntek-db
           property: password
+        value: controldoc
       # Conexión a Redis
       - key: REDIS_HOST
         fromService:
           type: redis
           name: inntek-redis
           property: host
+        value: inntek_redis
       - key: REDIS_PORT
         fromService:
           type: redis
           name: inntek-redis
           property: port
+        value: 3000
       - key: QUEUE_CONNECTION
         value: redis
       - key: SESSION_DRIVER
