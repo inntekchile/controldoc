@@ -56,6 +56,7 @@ envVarGroups:
           type: web
           name: inntek-app
           property: url
+        value: 0
       - key: APP_KEY
         generateValue: true # Render generará una clave segura en el primer despliegue.
       - key: APP_ENV
