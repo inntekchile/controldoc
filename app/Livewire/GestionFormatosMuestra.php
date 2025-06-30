@@ -5,8 +5,8 @@ namespace App\Livewire;
 use App\Models\FormatoDocumentoMuestra;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Livewire\WithFileUploads; // Para subida de archivos
-use Illuminate\Support\Facades\Storage; // Para manejo de archivos
+use Livewire\WithFileUploads;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\Layout;
 
@@ -19,11 +19,10 @@ class GestionFormatosMuestra extends Component
     public $formatoId;
     public $nombre;
     public $descripcion;
-    public $archivo_pdf; // Para el nuevo archivo subido
-    public $archivo_pdf_existente_ruta; // Para mostrar/mantener el archivo actual
+    public $archivo_pdf;
+    public $archivo_pdf_existente_ruta;
     public $nombre_archivo_original_existente;
     public $is_active = true;
-
     public $search = '';
     public $perPage = 10;
     public $sortBy = 'nombre';
@@ -39,23 +38,15 @@ class GestionFormatosMuestra extends Component
     protected function rules()
     {
         $rules = [
-            'nombre' => [
-                'required',
-                'string',
-                'min:3',
-                'max:255',
-                Rule::unique('formatos_documento_muestra', 'nombre')->ignore($this->formatoId),
-            ],
+            'nombre' => [ 'required', 'string', 'min:3', 'max:255', Rule::unique('formatos_documento_muestra', 'nombre')->ignore($this->formatoId) ],
             'descripcion' => 'nullable|string|max:1000',
             'is_active' => 'boolean',
         ];
-
-        if ($this->archivo_pdf) { // Si se está subiendo un nuevo archivo
-            $rules['archivo_pdf'] = 'required|file|mimes:pdf|max:10240'; // PDF, máximo 10MB
-        } elseif (!$this->formatoId) { // Si es un nuevo registro y no hay archivo
+        if ($this->archivo_pdf) {
+            $rules['archivo_pdf'] = 'required|file|mimes:pdf|max:10240';
+        } elseif (!$this->formatoId) {
             $rules['archivo_pdf'] = 'required|file|mimes:pdf|max:10240';
         }
-
         return $rules;
     }
 
@@ -81,10 +72,7 @@ class GestionFormatosMuestra extends Component
             })
             ->orderBy($this->sortBy, $this->sortDirection)
             ->paginate($this->perPage);
-
-        return view('livewire.gestion-formatos-muestra', [
-            'formatos' => $formatos,
-        ]);
+        return view('livewire.gestion-formatos-muestra', compact('formatos'));
     }
 
     public function create()
@@ -100,10 +88,10 @@ class GestionFormatosMuestra extends Component
         $this->formatoId = $id;
         $this->nombre = $formato->nombre;
         $this->descripcion = $formato->descripcion;
-        $this->archivo_pdf_existente_ruta = $formato->ruta_archivo; // Guardar ruta del archivo actual
+        $this->archivo_pdf_existente_ruta = $formato->ruta_archivo;
         $this->nombre_archivo_original_existente = $formato->nombre_archivo_original;
         $this->is_active = $formato->is_active;
-        $this->archivo_pdf = null; // Limpiar el campo de nuevo archivo
+        $this->archivo_pdf = null;
         $this->openModal();
     }
 
@@ -120,16 +108,18 @@ class GestionFormatosMuestra extends Component
         $currentFormato = $this->formatoId ? FormatoDocumentoMuestra::find($this->formatoId) : null;
 
         if ($this->archivo_pdf) {
-            // Eliminar archivo antiguo si existe y se está actualizando con uno nuevo
             if ($currentFormato && $currentFormato->ruta_archivo) {
-                if (Storage::disk('public')->exists($currentFormato->ruta_archivo)) {
-                    Storage::disk('public')->delete($currentFormato->ruta_archivo);
-                }
+                Storage::disk('public')->delete($currentFormato->ruta_archivo);
             }
-            // Guardar nuevo archivo
+            
             $nombreOriginal = $this->archivo_pdf->getClientOriginalName();
-            // Crear un nombre de archivo único para evitar colisiones y caracteres extraños
             $nombreArchivoUnico = uniqid('formato_') . '_' . time() . '.' . $this->archivo_pdf->getClientOriginalExtension();
+
+            // ================================================================
+            // CAMBIO ÚNICO Y CLAVE EN ESTE ARCHIVO
+            // Hemos simplificado la ruta para evitar confusiones.
+            // Todos los archivos se guardarán directamente en 'formatos_muestra'.
+            // ================================================================
             $rutaArchivo = $this->archivo_pdf->storeAs('formatos_muestra', $nombreArchivoUnico, 'public');
 
             $data['ruta_archivo'] = $rutaArchivo;
@@ -138,9 +128,7 @@ class GestionFormatosMuestra extends Component
 
         FormatoDocumentoMuestra::updateOrCreate(['id' => $this->formatoId], $data);
 
-        session()->flash('message',
-            $this->formatoId ? 'Formato de Muestra actualizado correctamente.' : 'Formato de Muestra creado correctamente.');
-
+        session()->flash('message', $this->formatoId ? 'Formato de Muestra actualizado.' : 'Formato de Muestra creado.');
         $this->closeModal();
         $this->resetInputFields();
     }
@@ -155,17 +143,11 @@ class GestionFormatosMuestra extends Component
 
     public function delete($id)
     {
-        // Para una eliminación real que dispare el evento 'deleting' del modelo:
-        // $formato = FormatoDocumentoMuestra::findOrFail($id);
-        // $formato->delete();
-        // session()->flash('message', 'Formato de Muestra eliminado y archivo asociado borrado.');
-
-        // Por ahora, solo desactivamos
         $formato = FormatoDocumentoMuestra::find($id);
         if ($formato) {
-            $formato->is_active = false;
-            $formato->save();
-            session()->flash('message', 'Formato de Muestra desactivado.');
+            // Esto llamará al evento 'deleting' en el modelo para borrar el archivo físico.
+            $formato->delete(); 
+            session()->flash('message', 'Formato de Muestra eliminado correctamente.');
         }
     }
 
@@ -180,8 +162,6 @@ class GestionFormatosMuestra extends Component
     {
         $this->isOpen = false;
         $this->resetInputFields();
-        $this->resetErrorBag();
-        $this->resetValidation();
     }
 
     private function resetInputFields()
@@ -193,6 +173,8 @@ class GestionFormatosMuestra extends Component
         $this->archivo_pdf_existente_ruta = null;
         $this->nombre_archivo_original_existente = null;
         $this->is_active = true;
+        $this->resetErrorBag();
+        $this->resetValidation();
     }
 
     public function sortBy($field)
@@ -210,7 +192,6 @@ class GestionFormatosMuestra extends Component
         $this->resetPage();
     }
 
-    // Para limpiar el input de archivo si se cierra el modal
     public function updatedIsOpen($value)
     {
         if (!$value) {

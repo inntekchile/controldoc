@@ -7,30 +7,20 @@ use App\Models\DocumentoCargado;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Foundation\Auth\Access\AuthorizationException;
-use Carbon\Carbon; // <--- IMPORTACIÓN AÑADIDA
+use Carbon\Carbon;
 
 class RevisarDocumento extends Component
 {
     public ?DocumentoCargado $documento = null;
     public ?DocumentoCargado $documentoRelacionado = null;
-    public $pdfUrl;
-
+    public ?string $pdfUrl = null; // Hecho nullable para más seguridad
     public $decision = null;
     public $isReadOnly = false;
     public $criteriosCumplidos = [];
-    
-    // ===============================================================
-    // INICIO: PROPIEDADES NUEVAS Y MODIFICADAS PARA FECHAS
-    // ===============================================================
     public $fechaVencimientoValidador;
     public $confirmaFechaVencimiento = false;
-
-    public $fechaEmisionValidador; // <-- NUEVA
-    public $confirmaFechaEmision = false; // <-- NUEVA
-    // ===============================================================
-    // FIN: PROPIEDADES NUEVAS Y MODIFICADAS
-    // ===============================================================
-    
+    public $fechaEmisionValidador;
+    public $confirmaFechaEmision = false;
     public $motivoDevolucion;
     public $motivosRechazoCalculados = [];
 
@@ -58,18 +48,19 @@ class RevisarDocumento extends Component
         }
 
         $this->documento = $documento;
-        $this->pdfUrl = Storage::disk('public')->exists($this->documento->ruta_archivo)
-                        ? Storage::disk('public')->url($this->documento->ruta_archivo)
-                        : null;
-
-        // ===============================================================
-        // INICIO: INICIALIZACIÓN DE AMBAS FECHAS
-        // ===============================================================
+        
+        // ======================================================================
+        // INICIO DE LA CORRECCIÓN
+        // Usamos el nuevo accesor 'url' del modelo para obtener la URL segura.
+        // Esto funcionará con todos los documentos (maquinarias, formatos, etc.)
+        // ======================================================================
+        $this->pdfUrl = $this->documento->url;
+        // ======================================================================
+        // FIN DE LA CORRECCIÓN
+        // ======================================================================
+        
         $this->fechaVencimientoValidador = $this->documento->fecha_vencimiento?->format('Y-m-d');
-        $this->fechaEmisionValidador = $this->documento->fecha_emision?->format('Y-m-d'); // <-- NUEVA
-        // ===============================================================
-        // FIN: INICIALIZACIÓN DE AMBAS FECHAS
-        // ===============================================================
+        $this->fechaEmisionValidador = $this->documento->fecha_emision?->format('Y-m-d');
 
         if ($this->documento->documento_relacionado_id_snapshot) {
              $this->documentoRelacionado = DocumentoCargado::where('entidad_id', $this->documento->entidad_id)
@@ -120,9 +111,6 @@ class RevisarDocumento extends Component
 
     private function aprobarDocumento()
     {
-        // ===============================================================
-        // INICIO: LÓGICA DE VALIDACIÓN PARA AMBAS FECHAS
-        // ===============================================================
         $validationRules = [];
         $validationMessages = [];
 
@@ -143,9 +131,6 @@ class RevisarDocumento extends Component
         if (!empty($validationRules)) {
             $this->validate($validationRules, $validationMessages);
         }
-        // ===============================================================
-        // FIN: LÓGICA DE VALIDACIÓN
-        // ===============================================================
         
         $updateData = [
             'estado_validacion' => 'Aprobado',
@@ -153,20 +138,14 @@ class RevisarDocumento extends Component
             'fecha_validacion' => now(),
             'observacion_rechazo' => null,
             'motivo_rechazo' => null,
-            'fecha_emision' => $this->fechaEmisionValidador, // <-- Guardar fecha de emisión validada
-            'fecha_vencimiento' => $this->fechaVencimientoValidador, // <-- Guardar fecha de vencimiento validada
+            'fecha_emision' => $this->fechaEmisionValidador,
+            'fecha_vencimiento' => $this->fechaVencimientoValidador,
         ];
 
-        // ===============================================================
-        // INICIO: RE-CÁLCULO DE FECHA DE VENCIMIENTO SI ES NECESARIO
-        // ===============================================================
         if ($this->documento->tipo_vencimiento_snapshot === 'DESDE EMISION' && $this->documento->valida_emision_snapshot) {
             $diasValidez = $this->documento->reglaDocumental->dias_validez_documento ?? 0;
             $updateData['fecha_vencimiento'] = Carbon::parse($this->fechaEmisionValidador)->addDays($diasValidez)->format('Y-m-d');
         }
-        // ===============================================================
-        // FIN: RE-CÁLCULO
-        // ===============================================================
 
         $this->documento->update($updateData);
 
@@ -217,21 +196,14 @@ class RevisarDocumento extends Component
         $criterios = $this->documento ? ($this->documento->criterios_snapshot ?? []) : [];
         $totalCriterios = count($criterios);
         $criteriosMarcados = count(array_filter($this->criteriosCumplidos));
-
         $puedeAprobar = ($totalCriterios > 0) ? ($totalCriterios === $criteriosMarcados) : true;
         
-        // ===============================================================
-        // INICIO: VERIFICACIÓN PARA HABILITAR BOTÓN "APROBAR"
-        // ===============================================================
         if($this->documento?->valida_vencimiento_snapshot && !$this->confirmaFechaVencimiento) {
             $puedeAprobar = false;
         }
-        if($this->documento?->valida_emision_snapshot && !$this->confirmaFechaEmision) { // <-- NUEVA CONDICIÓN
+        if($this->documento?->valida_emision_snapshot && !$this->confirmaFechaEmision) {
             $puedeAprobar = false;
         }
-        // ===============================================================
-        // FIN: VERIFICACIÓN
-        // ===============================================================
         
         $puedeRechazar = true;
         if ($totalCriterios > 0 && $totalCriterios === $criteriosMarcados) {

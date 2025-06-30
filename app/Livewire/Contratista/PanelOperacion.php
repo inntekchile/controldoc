@@ -217,18 +217,12 @@ class PanelOperacion extends Component
                     'valida_emision' => (bool) $regla->valida_emision,
                     'valida_vencimiento' => (bool) $regla->valida_vencimiento,
                     'tipo_vencimiento_nombre' => $regla->tipoVencimiento?->nombre,
-                    // =========================================================================================
-                    // INICIO: LÓGICA CORREGIDA PARA EL MAPEO DE CRITERIOS
-                    // =========================================================================================
                     'criterios_evaluacion' => $regla->criterios->map(fn ($c) => [
-                        'criterio' => $c->criterioEvaluacion?->nombre_criterio, // <-- CORREGIDO
+                        'criterio' => $c->criterioEvaluacion?->nombre_criterio,
                         'sub_criterio' => $c->subCriterio?->nombre,
-                        'texto_rechazo' => $c->textoRechazo?->titulo, // <-- CORREGIDO
-                        'aclaracion' => $c->aclaracionCriterio?->titulo // <-- CORREGIDO
+                        'texto_rechazo' => $c->textoRechazo?->titulo,
+                        'aclaracion' => $c->aclaracionCriterio?->titulo
                     ])->all(),
-                    // =========================================================================================
-                    // FIN: LÓGICA CORREGIDA
-                    // =========================================================================================
                     'afecta_cumplimiento' => (bool) $regla->afecta_porcentaje_cumplimiento,
                     'restringe_acceso' => (bool) $regla->restringe_acceso,
                 ];
@@ -281,7 +275,12 @@ class PanelOperacion extends Component
                 if ($docPendiente) { Storage::disk('public')->delete($docPendiente->ruta_archivo); $docPendiente->delete(); }
                 
                 $nombreArchivo = Str::uuid() . '.' . $archivo->getClientOriginalExtension();
-                $rutaDirectorio = "documentos/c-{$contratista->id}/empresa";
+                // ==============================================================================
+                // <-- INICIO DE LA MODIFICACIÓN CLAVE -->
+                // Simplificamos la ruta de guardado a la estructura "entidad/id"
+                $rutaDirectorio = "empresa/{$contratista->id}";
+                // <-- FIN DE LA MODIFICACIÓN CLAVE -->
+                // ==============================================================================
                 $rutaArchivo = $archivo->storeAs($rutaDirectorio, $nombreArchivo, 'public');
 
                 $fechaVencimientoCalculada = $data['fecha_vencimiento_input'] ?? null;

@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage; // <-- IMPORTANTE: AÑADIDO PARA MANEJAR ARCHIVOS
 
 // --- Importaciones de Componentes para ASEM_Admin ---
 use App\Livewire\GestionListadosUniversalesHub;
@@ -35,7 +36,6 @@ use App\Livewire\GestionTiposMaquinaria;
 use App\Livewire\GestionTiposEmbarcacion;
 use App\Livewire\GestionRegiones;
 use App\Livewire\GestionComunas;
-// Gestión Principal de Entidades por ASEM
 use App\Livewire\GestionMandantes;
 use App\Livewire\GestionUnidadesOrganizacionalesMandante;
 use App\Livewire\GestionCargosMandante;
@@ -45,13 +45,7 @@ use App\Livewire\Asem\AsignacionDocumentos;
 use App\Livewire\Asem\PanelValidacion;
 use App\Livewire\Asem\RevisarDocumento;
 use App\Livewire\GestionUsuarios;
-// =================================================================
-// INICIO: NUEVA IMPORTACIÓN
-// =================================================================
-use App\Livewire\Asem\GestionGeneralDocumentos; // <-- IMPORTACIÓN AÑADIDA
-// =================================================================
-// FIN: NUEVA IMPORTACIÓN
-// =================================================================
+use App\Livewire\Asem\GestionGeneralDocumentos;
 
 // --- Importaciones de Componentes para Contratista_Admin ---
 use App\Livewire\FichaContratista;
@@ -63,6 +57,22 @@ use App\Livewire\Contratista\PanelOperacion;
 | Web Routes
 |--------------------------------------------------------------------------
 */
+
+// ==============================================================================
+// INICIO DE LA MODIFICACIÓN CLAVE
+// Esta ruta se encargará de servir TODOS los archivos públicos de forma segura
+// y funcionará perfectamente con ngrok, sin depender del enlace simbólico.
+// ==============================================================================
+Route::get('/mostrar-archivo/{filePath}', function (string $filePath) {
+    if (!Storage::disk('public')->exists($filePath)) {
+        abort(404, 'El archivo solicitado no fue encontrado.');
+    }
+    return Storage::disk('public')->response($filePath);
+})->where('filePath', '.*')->name('archivo.publico')->middleware('auth'); // <-- AÑADIDO middleware('auth') por seguridad
+// ==============================================================================
+// FIN DE LA MODIFICACIÓN
+// ==============================================================================
+
 
 Route::view('/', 'welcome');
 
@@ -114,15 +124,7 @@ Route::prefix('gestion')->middleware(['auth', 'role:ASEM_Admin'])->name('gestion
     Route::get('/contratistas', GestionContratistas::class)->name('contratistas');
     Route::get('/reglas-documentales', GestionReglasDocumentales::class)->name('reglas-documentales');
     Route::get('/asignacion-documentos', AsignacionDocumentos::class)->name('asignacion-documentos');
-    
-    // =================================================================
-    // INICIO: NUEVA RUTA
-    // =================================================================
-    Route::get('/gestion-general', GestionGeneralDocumentos::class)->name('gestion-general'); // <-- RUTA AÑADIDA
-    // =================================================================
-    // FIN: NUEVA RUTA
-    // =================================================================
-
+    Route::get('/gestion-general', GestionGeneralDocumentos::class)->name('gestion-general');
     Route::get('/usuarios', GestionUsuarios::class)->name('usuarios');
 });
 

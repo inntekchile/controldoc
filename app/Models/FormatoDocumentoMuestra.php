@@ -4,7 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Storage; // Necesario para interactuar con el storage
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\Eloquent\Casts\Attribute; // Necesario para la sintaxis moderna
 
 class FormatoDocumentoMuestra extends Model
 {
@@ -24,18 +25,28 @@ class FormatoDocumentoMuestra extends Model
         'is_active' => 'boolean',
     ];
 
-    // Accesor para obtener la URL pública del archivo
-    public function getUrlArchivoAttribute()
+    // ======================================================================================
+    // INICIO DE LA CORRECCIÓN CLAVE
+    // Ahora, este método genera una URL a nuestra nueva ruta segura, en lugar de al
+    // problemático enlace simbólico de /storage.
+    // ======================================================================================
+    protected function urlArchivo(): Attribute
     {
-        if ($this->ruta_archivo && Storage::disk('public')->exists($this->ruta_archivo)) {
-            return Storage::disk('public')->url($this->ruta_archivo);
-        }
-        return null;
+        return Attribute::make(
+            get: function () {
+                if ($this->ruta_archivo) {
+                    // Genera una URL a la ruta que hemos nombrado 'archivo.publico',
+                    // pasándole la ruta del archivo como parámetro.
+                    return route('archivo.publico', ['filePath' => $this->ruta_archivo]);
+                }
+                return null;
+            }
+        );
     }
-
-    // Mutador para eliminar el archivo antiguo si se actualiza/elimina el registro
-    // Esto se puede manejar también en el componente o con Observers,
-    // pero un ejemplo de cómo se haría aquí con un evento 'deleting':
+    // ======================================================================================
+    // FIN DE LA CORRECCIÓN
+    // ======================================================================================
+    
     protected static function boot()
     {
         parent::boot();

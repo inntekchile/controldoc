@@ -55,6 +55,10 @@ class GestionTrabajadoresContratista extends Component
     public ?string $direccion_calle = null, $direccion_numero = null, $direccion_departamento = null;
     public ?int $trabajador_region_id = null, $trabajador_comuna_id = null;
     public bool $trabajador_is_active = true;
+
+    // ============== MODIFICACIÓN 1: Añadir propiedad para el cargo en el modal ==============
+    public ?int $cargo_mandante_id_nuevo = null; 
+
     public bool $showModalVinculacion = false;
     public ?int $vinculacionId = null;
     public ?int $v_mandante_id = null;
@@ -91,6 +95,8 @@ class GestionTrabajadoresContratista extends Component
             'v_motivo_desactivacion.required_if' => 'El motivo de desactivación es obligatorio si la vinculación no está activa.',
             'documentosParaCargar.*.archivo_input.mimes' => 'El archivo debe ser de tipo: pdf, jpg, png, doc, xls.',
             'documentosParaCargar.*.archivo_input.max' => 'El archivo no debe superar los 10MB.',
+            // ============== MODIFICACIÓN 2: Mensaje para el nuevo campo ==============
+            'cargo_mandante_id_nuevo.required' => 'Debe seleccionar un cargo para el nuevo trabajador.',
         ];
     }
 
@@ -172,7 +178,7 @@ class GestionTrabajadoresContratista extends Component
 
     public function rulesFichaTrabajador()
     {
-        return [
+        $rules = [
             'nombres' => 'required|string|max:100',
             'apellido_paterno' => 'required|string|max:100',
             'apellido_materno' => 'nullable|string|max:100',
@@ -193,6 +199,13 @@ class GestionTrabajadoresContratista extends Component
             'fecha_ingreso_empresa' => 'nullable|date',
             'trabajador_is_active' => 'boolean',
         ];
+
+        // ============== MODIFICACIÓN 3: Añadir regla de validación para el cargo SÓLO si es un nuevo trabajador ==============
+        if (!$this->trabajadorId) {
+            $rules['cargo_mandante_id_nuevo'] = 'required|exists:cargos_mandante,id';
+        }
+
+        return $rules;
     }
 
     public function updatedTrabajadorRegionId($value)
@@ -228,6 +241,7 @@ class GestionTrabajadoresContratista extends Component
         $this->trabajador_comuna_id = null;
         $this->trabajador_is_active = true;
         $this->comunasDisponiblesTrabajador = [];
+        $this->cargo_mandante_id_nuevo = null; // Limpiar el campo del cargo
         $this->resetValidation();
     }
 
@@ -238,6 +252,13 @@ class GestionTrabajadoresContratista extends Component
             return;
         }
         $this->resetFichaTrabajadorFields();
+        // ============== MODIFICACIÓN 4: Cargar los cargos disponibles para el mandante actual ==============
+        if ($this->mandanteId) {
+            $this->cargosMandanteDisponibles = CargoMandante::where('mandante_id', $this->mandanteId)
+                ->where('is_active', true)->orderBy('nombre_cargo')->get();
+        } else {
+            $this->cargosMandanteDisponibles = [];
+        }
         $this->showModalFichaTrabajador = true;
     }
 
@@ -313,12 +334,29 @@ class GestionTrabajadoresContratista extends Component
 
         DB::beginTransaction();
         try {
-            Trabajador::updateOrCreate(['id' => $this->trabajadorId], $datosParaGuardar);
-            session()->flash('message_trabajador', $this->trabajadorId ? 'Ficha del trabajador actualizada correctamente.' : 'Trabajador agregado correctamente.');
+            // ============== MODIFICACIÓN 5: Lógica de guardado mejorada ==============
+            $trabajador = Trabajador::updateOrCreate(['id' => $this->trabajadorId], $datosParaGuardar);
+
+            $esNuevoTrabajador = !$this->trabajadorId;
+
+            if ($esNuevoTrabajador && $this->selectedUnidadOrganizacionalId) {
+                // Ahora creamos la vinculación CON el cargo_mandante_id
+                TrabajadorVinculacion::create([
+                    'trabajador_id' => $trabajador->id,
+                    'unidad_organizacional_mandante_id' => $this->selectedUnidadOrganizacionalId,
+                    'cargo_mandante_id' => $this->cargo_mandante_id_nuevo, // Usamos el valor del nuevo campo
+                    'fecha_ingreso_vinculacion' => now(),
+                    'is_active' => true,
+                ]);
+                session()->flash('message_trabajador', 'Trabajador agregado y vinculado correctamente.');
+            } else {
+                session()->flash('message_trabajador', 'Ficha del trabajador actualizada correctamente.');
+            }
+
             DB::commit();
             $this->cerrarModalFichaTrabajador();
-            if ($this->trabajadorSeleccionado && $this->trabajadorSeleccionado->id == ($this->trabajadorId ?? null)) {
-                $this->trabajadorSeleccionado = Trabajador::find($this->trabajadorSeleccionado->id);
+            if ($this->trabajadorSeleccionado && $this->trabajadorSeleccionado->id == ($this->trabajadorId ?? $trabajador->id)) {
+                $this->trabajadorSeleccionado->refresh();
             }
         } catch (\Exception $e) {
             DB::rollBack();
@@ -332,6 +370,8 @@ class GestionTrabajadoresContratista extends Component
         $this->showModalFichaTrabajador = false;
         $this->resetFichaTrabajadorFields();
     }
+
+    // El resto de los métodos permanece sin cambios...
 
     public function toggleActivoTrabajador(Trabajador $trabajador)
     {
@@ -678,8 +718,6 @@ class GestionTrabajadoresContratista extends Component
             if ($errorValidacion) { $this->addError('documentosParaCargar.' . $reglaId . '.archivo_input', $errorValidacion); continue; }
 
             try {
-                // ***** CORRECCIÓN FINAL Y DEFINITIVA *****
-                // Se recarga la regla con TODAS sus relaciones BelongsTo para asegurar que tenemos todos los datos necesarios.
                 $reglaOriginal = ReglaDocumental::with([
                     'nombreDocumento', 'observacionDocumento', 'formatoDocumento', 'tipoVencimiento'
                 ])->findOrFail($reglaId);
@@ -688,7 +726,7 @@ class GestionTrabajadoresContratista extends Component
                 if ($documentoPendienteExistente) { Storage::disk('public')->delete($documentoPendienteExistente->ruta_archivo); $documentoPendienteExistente->delete(); }
 
                 $nombreArchivo = Str::uuid() . '.' . $archivo->getClientOriginalExtension();
-                $rutaDirectorio = "documentos/c-{$contratistaId}/trabajadores/t-{$this->trabajadorParaDocumentos->id}";
+                $rutaDirectorio = "trabajadores/{$this->trabajadorParaDocumentos->id}";
                 $rutaArchivo = $archivo->storeAs($rutaDirectorio, $nombreArchivo, 'public');
                 
                 DocumentoCargado::create([
@@ -707,21 +745,19 @@ class GestionTrabajadoresContratista extends Component
                     'periodo' => $data['periodo_input'] ?? null,
                     'estado_validacion' => 'Pendiente',
 
-                    // Usamos la $reglaOriginal (fresca de la BD) y las relaciones corregidas.
                     'nombre_documento_snapshot' => $reglaOriginal->nombreDocumento?->nombre,
                     'observacion_documento_snapshot' => $reglaOriginal->observacionDocumento?->titulo,
-                    'formato_documento_snapshot' => $reglaOriginal->formatoDocumento?->nombre, // <--- CORREGIDO CON RELACIÓN
+                    'formato_documento_snapshot' => $reglaOriginal->formatoDocumento?->nombre,
                     'documento_relacionado_id_snapshot' => $reglaOriginal->documento_relacionado_id,
                     'tipo_vencimiento_snapshot' => $reglaOriginal->tipoVencimiento?->nombre,
                     'valida_emision_snapshot' => (bool)$reglaOriginal->valida_emision,
                     'valida_vencimiento_snapshot' => (bool)$reglaOriginal->valida_vencimiento,
-                    'valor_nominal_snapshot' => $reglaOriginal->valor_nominal_documento,  // <--- CORREGIDO CON NOMBRE DE CAMPO REAL
+                    'valor_nominal_snapshot' => $reglaOriginal->valor_nominal_documento,
                     'habilita_acceso_snapshot' => (bool)$reglaOriginal->restringe_acceso,
                     'afecta_cumplimiento_snapshot' => (bool)$reglaOriginal->afecta_porcentaje_cumplimiento,
-                    'es_perseguidor_snapshot' => (bool)$reglaOriginal->documento_es_perseguidor, // <--- CORREGIDO CON NOMBRE DE CAMPO REAL
+                    'es_perseguidor_snapshot' => (bool)$reglaOriginal->documento_es_perseguidor,
                     'criterios_snapshot' => $infoRegla['criterios_evaluacion'],
                 ]);
-                // ***** FIN DE LA CORRECCIÓN *****
 
                 $this->uploadSuccess[$reglaId] = 'Archivo cargado exitosamente.';
             } catch (\Exception $e) {

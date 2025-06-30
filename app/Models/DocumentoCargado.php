@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Storage; // <-- Importación necesaria
 
 class DocumentoCargado extends Model
 {
@@ -14,43 +15,9 @@ class DocumentoCargado extends Model
 
     protected $table = 'documentos_cargados';
 
-    protected $fillable = [
-        'contratista_id',
-        'mandante_id',
-        'unidad_organizacional_id',
-        'entidad_id',
-        'entidad_type',
-        'regla_documental_id_origen',
-        'usuario_carga_id',
-        'ruta_archivo',
-        'nombre_original_archivo',
-        'mime_type',
-        'tamano_archivo',
-        'fecha_emision',
-        'fecha_vencimiento',
-        'periodo',
-        'estado_validacion',
-        'resultado_validacion',
-        'archivado',
-        'asem_validador_id',
-        'fecha_validacion',
-        'observacion_interna_asem',
-        'observacion_rechazo',
-        'requiere_revalidacion',
-        'motivo_revalidacion',
-        'nombre_documento_snapshot',
-        'tipo_vencimiento_snapshot',
-        'valida_emision_snapshot',
-        'valida_vencimiento_snapshot',
-        'valor_nominal_snapshot',
-        'habilita_acceso_snapshot',
-        'afecta_cumplimiento_snapshot',
-        'es_perseguidor_snapshot',
-        'criterios_snapshot',
-        'observacion_documento_snapshot',
-        'formato_documento_snapshot',
-        'documento_relacionado_id_snapshot',
-    ];
+    // Se usa guarded en lugar de fillable para permitir todos los campos de forma segura
+    // ya que estamos controlando la creación en el componente Livewire.
+    protected $guarded = ['id'];
 
     protected $casts = [
         'fecha_emision' => 'date',
@@ -66,6 +33,26 @@ class DocumentoCargado extends Model
         'es_perseguidor_snapshot' => 'boolean',
     ];
 
+    // ======================================================================================
+    // INICIO DE LA CORRECCIÓN
+    // Se añade un nuevo "Accessor" para generar una URL segura a nuestra ruta controlada.
+    // ======================================================================================
+    protected function url(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if ($this->ruta_archivo) {
+                    // Genera una URL a la ruta que hemos nombrado 'archivo.publico'
+                    return route('archivo.publico', ['filePath' => $this->ruta_archivo]);
+                }
+                return '#'; // Devuelve un enlace no funcional si no hay archivo
+            }
+        );
+    }
+    // ======================================================================================
+    // FIN DE LA CORRECCIÓN
+    // ======================================================================================
+    
     public function entidad()
     {
         return $this->morphTo();
@@ -83,6 +70,7 @@ class DocumentoCargado extends Model
 
     public function validador(): BelongsTo
     {
+        // Asumiendo que tu modelo de usuario es App\Models\User
         return $this->belongsTo(User::class, 'asem_validador_id');
     }
 
@@ -98,18 +86,15 @@ class DocumentoCargado extends Model
                 if ($this->requiere_revalidacion) {
                     return 'Revalidar';
                 }
-                
                 if (is_null($this->asem_validador_id)) {
                     if ($this->estado_validacion === 'Rechazado') {
                          return 'Devuelto';
                     }
                     return 'Sin Asignar';
                 }
-
                 if ($this->resultado_validacion) {
                     return 'Revisado';
                 }
-
                 return 'Asignado';
             }
         );
@@ -119,23 +104,25 @@ class DocumentoCargado extends Model
     {
         return Attribute::make(
             get: function ($value) {
-                // ==========================================================
-                // INICIO: LÓGICA MODIFICADA PARA ESTADO DE VIGENCIA
-                // ==========================================================
                 if (is_null($this->fecha_vencimiento)) {
-                    // Cambiamos "No Aplica" por "Por Periodo"
                     return 'Por Periodo';
                 }
-                
                 if (Carbon::parse($this->fecha_vencimiento)->endOfDay()->isPast()) {
                     return 'Vencido';
                 }
-
                 return 'Vigente';
-                // ==========================================================
-                // FIN: LÓGICA MODIFICADA
-                // ==========================================================
             }
         );
+    }
+
+    // Evento para borrar el archivo físico al eliminar el registro
+    protected static function boot()
+    {
+        parent::boot();
+        static::deleting(function ($documento) {
+            if ($documento->ruta_archivo) {
+                Storage::disk('public')->delete($documento->ruta_archivo);
+            }
+        });
     }
 }

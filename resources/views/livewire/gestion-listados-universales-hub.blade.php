@@ -12,7 +12,7 @@
 
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900 dark:text-gray-100">
-                    <p class="mb-6 text-lg">Aquí puede administrar los diferentes catálogos y listados maestros del sistema.</p>
+                    <p class="mb-6 text-lg">ESTE ES UN CLON DE LOS LISTADOS UNIVERSALES.</p>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {{-- Primer grupo de listados generales --}}
                         <a href="{{ route('gestion.documentos') }}" wire:navigate class="listado-hub-card"><h5 class="listado-hub-title">Documentos</h5><p class="listado-hub-description">Tipos de documentos genéricos.</p></a>

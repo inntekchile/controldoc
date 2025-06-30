@@ -22,7 +22,7 @@ use Livewire\WithFileUploads;
 use App\Models\DocumentoCargado;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Carbon\Carbon; // <--- IMPORTACIÓN AÑADIDA
+use Carbon\Carbon;
 
 class GestionVehiculos extends Component
 {
@@ -259,20 +259,19 @@ class GestionVehiculos extends Component
                 if ($docPendiente) { Storage::disk('public')->delete($docPendiente->ruta_archivo); $docPendiente->delete(); }
                 
                 $nombreArchivo = Str::uuid() . '.' . $archivo->getClientOriginalExtension();
-                $rutaDirectorio = "documentos/c-{$this->contratistaId}/vehiculos/v-{$this->vehiculoParaDocumentos->id}";
+                // ==============================================================================
+                // <-- INICIO DE LA MODIFICACIÓN CLAVE -->
+                // Simplificamos la ruta de guardado a la estructura "entidad/id"
+                $rutaDirectorio = "vehiculos/{$this->vehiculoParaDocumentos->id}";
+                // <-- FIN DE LA MODIFICACIÓN CLAVE -->
+                // ==============================================================================
                 $rutaArchivo = $archivo->storeAs($rutaDirectorio, $nombreArchivo, 'public');
 
-                // =========================================================================================
-                // INICIO: LÓGICA CORREGIDA PARA EL CÁLCULO DE LA FECHA DE VENCIMIENTO
-                // =========================================================================================
                 $fechaVencimientoCalculada = $data['fecha_vencimiento_input'] ?? null;
                 if ($reglaOriginal->tipoVencimiento?->nombre === 'DESDE EMISION' && !empty($data['fecha_emision_input'])) {
                     $diasValidez = $reglaOriginal->dias_validez_documento ?? 0;
                     $fechaVencimientoCalculada = Carbon::parse($data['fecha_emision_input'])->addDays($diasValidez)->format('Y-m-d');
                 }
-                // =========================================================================================
-                // FIN: LÓGICA CORREGIDA
-                // =========================================================================================
 
                 DocumentoCargado::create([
                     'contratista_id' => $this->contratistaId, 
@@ -287,7 +286,7 @@ class GestionVehiculos extends Component
                     'mime_type' => $archivo->getMimeType(), 
                     'tamano_archivo' => $archivo->getSize(), 
                     'fecha_emision' => $data['fecha_emision_input'] ?? null,
-                    'fecha_vencimiento' => $fechaVencimientoCalculada, // <-- Se usa la variable calculada
+                    'fecha_vencimiento' => $fechaVencimientoCalculada,
                     'periodo' => isset($data['periodo_input']) ? date('Y-m', strtotime($data['periodo_input'])) : null, 
                     'estado_validacion' => 'Pendiente',
 

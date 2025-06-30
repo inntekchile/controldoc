@@ -11,6 +11,16 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+
+        // ================================================================
+        // INICIO DE LA MODIFICACIÓN
+        // Le decimos a Laravel que confíe en los proxies (como ngrok).
+        // Lo añadimos al principio de la pila de middleware web.
+        // ================================================================
+        $middleware->prependToGroup('web', \App\Http\Middleware\TrustProxies::class);
+
+
+        // El resto de tu configuración de middleware se mantiene igual.
         $middleware->web(append: [
             \Illuminate\Cookie\Middleware\EncryptCookies::class,
             \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,

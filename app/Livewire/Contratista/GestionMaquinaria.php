@@ -21,7 +21,7 @@ use Livewire\WithFileUploads;
 use App\Models\DocumentoCargado;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Carbon\Carbon; // <--- IMPORTACIÓN AÑADIDA
+use Carbon\Carbon;
 
 class GestionMaquinaria extends Component
 {
@@ -62,15 +62,32 @@ class GestionMaquinaria extends Component
 
     private DocumentoRequeridoService $documentoService;
 
-    public function boot(DocumentoRequeridoService $documentoService) { $this->documentoService = $documentoService; }
-    protected function messages() { return [ '*.required' => 'Este campo es obligatorio.', 'identificador_letras.unique' => 'El código/patente ingresado ya existe para su empresa.', 'a_unidad_organizacional_id.required' => 'Debe seleccionar una Unidad Organizacional.', 'a_fecha_asignacion.required' => 'La fecha de asignación es obligatoria.', 'a_fecha_desasignacion.required_if' => 'La fecha es obligatoria si la asignación no está activa.', 'a_motivo_desasignacion.required_if' => 'El motivo es obligatorio si la asignación no está activa.', ]; }
+    public function boot(DocumentoRequeridoService $documentoService)
+    {
+        $this->documentoService = $documentoService;
+    }
+
+    protected function messages()
+    {
+        return [
+            '*.required' => 'Este campo es obligatorio.',
+            'identificador_letras.unique' => 'El código/patente ingresado ya existe para su empresa.',
+            'a_unidad_organizacional_id.required' => 'Debe seleccionar una Unidad Organizacional.',
+            'a_fecha_asignacion.required' => 'La fecha de asignación es obligatoria.',
+            'a_fecha_desasignacion.required_if' => 'La fecha es obligatoria si la asignación no está activa.',
+            'a_motivo_desasignacion.required_if' => 'El motivo es obligatorio si la asignación no está activa.',
+        ];
+    }
 
     public function mount(?int $mandanteId = null, ?int $unidadOrganizacionalId = null)
     {
         $this->mandanteId = $mandanteId;
         $this->unidadOrganizacionalId = $unidadOrganizacionalId;
         $user = Auth::user();
-        if (!$user || !$user->contratista_id) { session()->flash('error', 'Usuario no asociado a un contratista válido.'); return; }
+        if (!$user || !$user->contratista_id) {
+            session()->flash('error', 'Usuario no asociado a un contratista válido.');
+            return;
+        }
         $this->contratistaId = $user->contratista_id;
         if ($this->unidadOrganizacionalId) {
             $uoContexto = UnidadOrganizacionalMandante::with('mandante:id,razon_social')->find($this->unidadOrganizacionalId);
@@ -82,36 +99,30 @@ class GestionMaquinaria extends Component
         $this->marcas = MarcaVehiculo::where('is_active', true)->orderBy('nombre')->get();
         $this->tenencias = TenenciaVehiculo::where('is_active', true)->orderBy('nombre')->get();
     }
-    
+
     public function abrirModalDocumentos($maquinariaId, $mantenerMensajes = false)
     {
-        if (!$this->unidadOrganizacionalId || !$this->mandanteId) { session()->flash('error', 'Error de contexto. Por favor, seleccione una vinculación para operar.'); return; }
-        
-        $this->maquinariaParaDocumentos = Maquinaria::with(['marca', 'tipoMaquinaria'])->find($maquinariaId);
-        
-        if (!$this->maquinariaParaDocumentos || $this->maquinariaParaDocumentos->contratista_id != $this->contratistaId) { 
-            session()->flash('error_modal_documentos', 'Maquinaria no encontrada o no pertenece a su empresa.'); 
-            $this->cerrarModalDocumentos(); 
-            return; 
+        if (!$this->unidadOrganizacionalId || !$this->mandanteId) {
+            session()->flash('error', 'Error de contexto. Por favor, seleccione una vinculación para operar.');
+            return;
         }
-        
+        $this->maquinariaParaDocumentos = Maquinaria::with(['marca', 'tipoMaquinaria'])->find($maquinariaId);
+        if (!$this->maquinariaParaDocumentos || $this->maquinariaParaDocumentos->contratista_id != $this->contratistaId) {
+            session()->flash('error_modal_documentos', 'Maquinaria no encontrada o no pertenece a su empresa.');
+            $this->cerrarModalDocumentos();
+            return;
+        }
         $this->nombreMaquinariaParaDocumentosModal = $this->maquinariaParaDocumentos->identificador_completo;
         $this->determinarDocumentosRequeridosParaMaquinaria();
-        
-        if (!$mantenerMensajes) { 
-            $this->uploadErrors = []; 
-            $this->uploadSuccess = []; 
+        if (!$mantenerMensajes) {
+            $this->uploadErrors = [];
+            $this->uploadSuccess = [];
         }
-
         $tempDocumentosParaCargar = [];
         foreach ($this->documentosRequeridos as $doc) {
             $reglaId = $doc['regla_documental_id_origen'];
             $tempDocumentosParaCargar[$reglaId] = [
-                'archivo_input' => null, 
-                'fecha_emision_input' => null, 
-                'fecha_vencimiento_input' => null, 
-                'periodo_input' => null,
-                'regla_info' => $doc, 
+                'archivo_input' => null, 'fecha_emision_input' => null, 'fecha_vencimiento_input' => null, 'periodo_input' => null, 'regla_info' => $doc,
             ];
         }
         $this->documentosParaCargar = $tempDocumentosParaCargar;
@@ -122,35 +133,23 @@ class GestionMaquinaria extends Component
     private function determinarDocumentosRequeridosParaMaquinaria()
     {
         $reglasCandidatas = $this->documentoService->getReglasParaEntidadEnUO($this->mandanteId, $this->unidadOrganizacionalId, 'MAQUINARIA')
-            ->load([
-                'nombreDocumento', 'observacionDocumento', 'formatoDocumento', 'documentoRelacionado',
-                'tipoVencimiento', 'criterios.criterioEvaluacion', 'criterios.subCriterio',
-                'criterios.textoRechazo', 'criterios.aclaracionCriterio', 'tiposMaquinariaAplica:id',
-                'tenenciasAplica:id'
-            ]);
+            ->load(['nombreDocumento', 'observacionDocumento', 'formatoDocumento', 'documentoRelacionado', 'tipoVencimiento', 'criterios.criterioEvaluacion', 'criterios.subCriterio', 'criterios.textoRechazo', 'criterios.aclaracionCriterio', 'tiposMaquinariaAplica:id', 'tenenciasAplica:id']);
 
-        $documentosCargadosExistentes = DocumentoCargado::where('entidad_id', $this->maquinariaParaDocumentos->id)
-            ->where('entidad_type', Maquinaria::class)->where('archivado', false)
-            ->orderBy('created_at', 'desc')->get()->keyBy('regla_documental_id_origen');
-
+        $documentosCargadosExistentes = DocumentoCargado::where('entidad_id', $this->maquinariaParaDocumentos->id)->where('entidad_type', Maquinaria::class)->where('archivado', false)->orderBy('created_at', 'desc')->get()->keyBy('regla_documental_id_origen');
         $condicionContratistaEnUO = DB::table('contratista_unidad_organizacional')->where('contratista_id', $this->contratistaId)->where('unidad_organizacional_mandante_id', $this->unidadOrganizacionalId)->value('tipo_condicion_id');
-        
-        $documentosFinales = []; 
+        $documentosFinales = [];
         $idsDocumentosAgregados = [];
 
         foreach ($reglasCandidatas as $regla) {
             if ($regla->aplica_empresa_condicion_id && $regla->aplica_empresa_condicion_id != $condicionContratistaEnUO) continue;
-
             $identificadorCompleto = $this->maquinariaParaDocumentos->identificador_letras . $this->maquinariaParaDocumentos->identificador_numeros;
             if (!empty($regla->rut_especificos) && !in_array($identificadorCompleto, array_map('trim', explode(',', $regla->rut_especificos)))) continue;
             if (!empty($regla->rut_excluidos) && in_array($identificadorCompleto, array_map('trim', explode(',', $regla->rut_excluidos)))) continue;
-
             $idsTiposMaquinariaRegla = $regla->tiposMaquinariaAplica->pluck('id')->toArray();
             if (!empty($idsTiposMaquinariaRegla) && (!$this->maquinariaParaDocumentos->tipo_maquinaria_id || !in_array($this->maquinariaParaDocumentos->tipo_maquinaria_id, $idsTiposMaquinariaRegla))) continue;
-            
             $idsTenenciasRegla = $regla->tenenciasAplica->pluck('id')->toArray();
             if (!empty($idsTenenciasRegla) && (!$this->maquinariaParaDocumentos->tenencia_vehiculo_id || !in_array($this->maquinariaParaDocumentos->tenencia_vehiculo_id, $idsTenenciasRegla))) continue;
-            
+
             if (!in_array($regla->nombre_documento_id, $idsDocumentosAgregados)) {
                 $docCargado = $documentosCargadosExistentes->get($regla->id);
                 $estadoActual = 'No Cargado';
@@ -162,18 +161,11 @@ class GestionMaquinaria extends Component
                 }
 
                 $documentosFinales[] = [
-                    'regla_documental_id_origen' => $regla->id,
-                    'nombre_documento_id' => $regla->nombre_documento_id,
-                    'nombre_documento_texto' => $regla->nombreDocumento?->nombre ?? 'Doc. Desconocido',
-                    'observacion_documento_texto' => $regla->observacionDocumento?->titulo,
-                    'estado_actual_documento' => $estadoActual,
-                    'archivo_cargado' => $docCargado,
-                    'valida_emision' => (bool) $regla->valida_emision,
-                    'valida_vencimiento' => (bool) $regla->valida_vencimiento,
-                    'tipo_vencimiento_nombre' => $regla->tipoVencimiento?->nombre,
-                    'criterios_evaluacion' => $regla->criterios->map(fn($c) => ['criterio' => $c->criterioEvaluacion?->nombre_criterio, 'sub_criterio' => $c->subCriterio?->nombre, 'texto_rechazo' => $c->textoRechazo?->titulo, 'aclaracion' => $c->aclaracionCriterio?->titulo,])->all(),
-                    'afecta_cumplimiento' => (bool) $regla->afecta_porcentaje_cumplimiento,
-                    'restringe_acceso' => (bool) $regla->restringe_acceso,
+                    'regla_documental_id_origen' => $regla->id, 'nombre_documento_id' => $regla->nombre_documento_id, 'nombre_documento_texto' => $regla->nombreDocumento?->nombre ?? 'Doc. Desconocido',
+                    'observacion_documento_texto' => $regla->observacionDocumento?->titulo, 'estado_actual_documento' => $estadoActual, 'archivo_cargado' => $docCargado,
+                    'valida_emision' => (bool) $regla->valida_emision, 'valida_vencimiento' => (bool) $regla->valida_vencimiento, 'tipo_vencimiento_nombre' => $regla->tipoVencimiento?->nombre,
+                    'criterios_evaluacion' => $regla->criterios->map(fn($c) => ['criterio' => $c->criterioEvaluacion?->nombre_criterio, 'sub_criterio' => $c->subCriterio?->nombre, 'texto_rechazo' => $c->textoRechazo?->titulo, 'aclaracion' => $c->aclaracionCriterio?->titulo])->all(),
+                    'afecta_cumplimiento' => (bool) $regla->afecta_porcentaje_cumplimiento, 'restringe_acceso' => (bool) $regla->restringe_acceso,
                 ];
                 $idsDocumentosAgregados[] = $regla->nombre_documento_id;
             }
@@ -181,84 +173,62 @@ class GestionMaquinaria extends Component
         $this->documentosRequeridos = $documentosFinales;
     }
 
-    public function cerrarModalDocumentos() {
-        $this->showDocumentosModal = false; 
-        $this->maquinariaParaDocumentos = null;
-        $this->nombreMaquinariaParaDocumentosModal = ''; 
-        $this->documentosRequeridos = [];
-        $this->documentosParaCargar = []; 
-        $this->uploadErrors = [];
-        $this->uploadSuccess = []; 
-        $this->resetValidation();
+    public function cerrarModalDocumentos()
+    {
+        $this->showDocumentosModal = false; $this->maquinariaParaDocumentos = null; $this->nombreMaquinariaParaDocumentosModal = ''; $this->documentosRequeridos = []; $this->documentosParaCargar = []; $this->uploadErrors = []; $this->uploadSuccess = []; $this->resetValidation();
     }
-    
-    public function cargarDocumentos() {
-        if (!$this->maquinariaParaDocumentos) { session()->flash('error_modal_documentos', 'Error: No se ha seleccionado una maquinaria válida.'); return; }
-        
-        $this->uploadErrors = []; 
-        $this->uploadSuccess = []; 
-        $this->resetErrorBag();
-        $this->validate(['documentosParaCargar.*.archivo_input' => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx|max:10240']);
 
-        $usuarioCargaId = Auth::id(); 
-        $huboArchivosParaProcesar = false;
+    public function cargarDocumentos()
+    {
+        if (!$this->maquinariaParaDocumentos) { session()->flash('error_modal_documentos', 'Error: No se ha seleccionado una maquinaria válida.'); return; }
+        $this->uploadErrors = []; $this->uploadSuccess = []; $this->resetErrorBag(); $this->validate(['documentosParaCargar.*.archivo_input' => 'nullable|file|mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx|max:10240']);
+        $usuarioCargaId = Auth::id(); $huboArchivosParaProcesar = false;
 
         foreach ($this->documentosParaCargar as $reglaId => $data) {
             if (empty($data['archivo_input'])) continue;
-            
-            $huboArchivosParaProcesar = true;
-            $reglaInfo = $data['regla_info'];
-            $archivo = $data['archivo_input'];
-
+            $huboArchivosParaProcesar = true; $reglaInfo = $data['regla_info']; $archivo = $data['archivo_input'];
             $errorValidacion = null;
             if (($reglaInfo['valida_emision'] || $reglaInfo['tipo_vencimiento_nombre'] === 'DESDE EMISION') && empty($data['fecha_emision_input'])) { $errorValidacion = 'Se requiere Fecha de Emisión.'; }
             if (($reglaInfo['valida_vencimiento'] || $reglaInfo['tipo_vencimiento_nombre'] === 'FIJO') && empty($data['fecha_vencimiento_input'])) { $errorValidacion = 'Se requiere Fecha de Vencimiento.'; }
             if ($reglaInfo['tipo_vencimiento_nombre'] === 'PERIODO' && empty($data['periodo_input'])) { $errorValidacion = 'Se requiere el Período.'; }
             if ($errorValidacion) { $this->addError('documentosParaCargar.' . $reglaId . '.archivo_input', $errorValidacion); continue; }
-            
+
             try {
                 $reglaOriginal = ReglaDocumental::with(['nombreDocumento', 'observacionDocumento', 'formatoDocumento', 'tipoVencimiento'])->findOrFail($reglaId);
 
                 $docPendiente = DocumentoCargado::where('entidad_id', $this->maquinariaParaDocumentos->id)->where('entidad_type', Maquinaria::class)->where('regla_documental_id_origen', $reglaId)->where('estado_validacion', 'Pendiente')->where('archivado', false)->first();
                 if ($docPendiente) { Storage::disk('public')->delete($docPendiente->ruta_archivo); $docPendiente->delete(); }
                 
+                // ======================================================================================
+                // INICIO DE LA CORRECCIÓN DE LA RUTA
+                // Este código ahora guarda los archivos de las maquinarias en una ruta
+                // consistente y predecible. Ya no usa subcarpetas como c- o m-
+                // ======================================================================================
                 $nombreArchivo = Str::uuid() . '.' . $archivo->getClientOriginalExtension();
-                $rutaDirectorio = "documentos/c-{$this->contratistaId}/maquinarias/m-{$this->maquinariaParaDocumentos->id}";
+                $rutaDirectorio = 'maquinarias'; // RUTA SIMPLIFICADA Y CONSISTENTE
                 $rutaArchivo = $archivo->storeAs($rutaDirectorio, $nombreArchivo, 'public');
+                // ======================================================================================
+                // FIN DE LA CORRECCIÓN
+                // ======================================================================================
 
-                // =========================================================================================
-                // INICIO: LÓGICA CORREGIDA PARA EL CÁLCULO DE LA FECHA DE VENCIMIENTO
-                // =========================================================================================
                 $fechaVencimientoCalculada = $data['fecha_vencimiento_input'] ?? null;
                 if ($reglaOriginal->tipoVencimiento?->nombre === 'DESDE EMISION' && !empty($data['fecha_emision_input'])) {
                     $diasValidez = $reglaOriginal->dias_validez_documento ?? 0;
                     $fechaVencimientoCalculada = Carbon::parse($data['fecha_emision_input'])->addDays($diasValidez)->format('Y-m-d');
                 }
-                // =========================================================================================
-                // FIN: LÓGICA CORREGIDA
-                // =========================================================================================
 
                 DocumentoCargado::create([
                     'contratista_id' => $this->contratistaId, 'mandante_id' => $this->mandanteId, 'unidad_organizacional_id' => $this->unidadOrganizacionalId,
                     'entidad_id' => $this->maquinariaParaDocumentos->id, 'entidad_type' => Maquinaria::class, 'regla_documental_id_origen' => $reglaId,
                     'usuario_carga_id' => $usuarioCargaId, 'ruta_archivo' => $rutaArchivo, 'nombre_original_archivo' => $archivo->getClientOriginalName(),
                     'mime_type' => $archivo->getMimeType(), 'tamano_archivo' => $archivo->getSize(), 'fecha_emision' => $data['fecha_emision_input'] ?? null,
-                    'fecha_vencimiento' => $fechaVencimientoCalculada, // <-- Se usa la variable calculada
-                    'periodo' => isset($data['periodo_input']) ? date('Y-m', strtotime($data['periodo_input'])) : null, 
-                    'estado_validacion' => 'Pendiente', 
-                    
-                    'nombre_documento_snapshot' => $reglaOriginal->nombreDocumento?->nombre,
-                    'observacion_documento_snapshot' => $reglaOriginal->observacionDocumento?->titulo,
-                    'formato_documento_snapshot' => $reglaOriginal->formatoDocumento?->nombre,
-                    'documento_relacionado_id_snapshot' => $reglaOriginal->documento_relacionado_id,
-                    'tipo_vencimiento_snapshot' => $reglaOriginal->tipoVencimiento?->nombre,
-                    'valida_emision_snapshot' => (bool)$reglaOriginal->valida_emision,
-                    'valida_vencimiento_snapshot' => (bool)$reglaOriginal->valida_vencimiento,
-                    'valor_nominal_snapshot' => $reglaOriginal->valor_nominal_documento,
-                    'habilita_acceso_snapshot' => (bool)$reglaOriginal->restringe_acceso,
-                    'afecta_cumplimiento_snapshot' => (bool)$reglaOriginal->afecta_porcentaje_cumplimiento,
-                    'es_perseguidor_snapshot' => (bool)$reglaOriginal->documento_es_perseguidor,
-                    'criterios_snapshot' => $reglaInfo['criterios_evaluacion'],
+                    'fecha_vencimiento' => $fechaVencimientoCalculada, 'periodo' => isset($data['periodo_input']) ? date('Y-m', strtotime($data['periodo_input'])) : null, 
+                    'estado_validacion' => 'Pendiente', 'nombre_documento_snapshot' => $reglaOriginal->nombreDocumento?->nombre, 'observacion_documento_snapshot' => $reglaOriginal->observacionDocumento?->titulo,
+                    'formato_documento_snapshot' => $reglaOriginal->formatoDocumento?->nombre, 'documento_relacionado_id_snapshot' => $reglaOriginal->documento_relacionado_id,
+                    'tipo_vencimiento_snapshot' => $reglaOriginal->tipoVencimiento?->nombre, 'valida_emision_snapshot' => (bool)$reglaOriginal->valida_emision,
+                    'valida_vencimiento_snapshot' => (bool)$reglaOriginal->valida_vencimiento, 'valor_nominal_snapshot' => $reglaOriginal->valor_nominal_documento,
+                    'habilita_acceso_snapshot' => (bool)$reglaOriginal->restringe_acceso, 'afecta_cumplimiento_snapshot' => (bool)$reglaOriginal->afecta_porcentaje_cumplimiento,
+                    'es_perseguidor_snapshot' => (bool)$reglaOriginal->documento_es_perseguidor, 'criterios_snapshot' => $reglaInfo['criterios_evaluacion'],
                 ]);
                 $this->uploadSuccess[$reglaId] = 'Archivo cargado exitosamente.';
             } catch (\Exception $e) { 
@@ -325,5 +295,32 @@ class GestionMaquinaria extends Component
     
     public function sortBy($field) { if ($this->sortBy === $field) { $this->sortDirection = $this->sortDirection === 'asc' ? 'desc' : 'asc'; } else { $this->sortDirection = 'asc'; } $this->sortBy = $field; }
     
-    public function render() { $maquinariasPaginadas = null; $asignacionesPaginadas = null; if ($this->vistaActual === 'listado_maquinaria') { $query = Maquinaria::query()->where('contratista_id', $this->contratistaId); if ($this->unidadOrganizacionalId) { $query->whereHas('unidadesOrganizacionales', fn($q) => $q->where('unidad_organizacional_mandante_id', $this->unidadOrganizacionalId)); } else { $query->whereRaw('1 = 0'); } if (!empty($this->searchMaquinaria)) { $query->where(fn($q) => $q->where( \DB::raw("CONCAT(identificador_letras, identificador_numeros)"), 'like', '%' . str_replace('-', '', $this->searchMaquinaria) . '%')->orWhereHas('marca', fn($sub) => $sub->where('nombre', 'like', '%'.$this->searchMaquinaria.'%'))->orWhereHas('tipoMaquinaria', fn($sub) => $sub->where('nombre', 'like', '%'.$this->searchMaquinaria.'%'))); } $maquinariasPaginadas = $query->with('tipoMaquinaria', 'marca')->orderBy($this->sortBy, $this->sortDirection)->paginate(10, ['*'], 'maquinariaPage'); } elseif ($this->vistaActual === 'listado_asignaciones' && $this->maquinariaSeleccionada) { $asignacionesPaginadas = $this->maquinariaSeleccionada->unidadesOrganizacionales()->with('mandante:id,razon_social')->orderBy('pivot_is_active', 'desc')->orderBy('pivot_fecha_asignacion', 'desc')->paginate(10, ['*'], 'asignacionesPage'); } return view('livewire.contratista.gestion-maquinaria', [ 'maquinariasPaginadas' => $maquinariasPaginadas, 'asignacionesPaginadas' => $asignacionesPaginadas, ]); }
+    public function updatingSearch() { $this->resetPage(); }
+    
+    public function updatedIsOpen($value) { if (!$value) { $this->archivo_pdf = null; } }
+
+    public function render()
+    {
+        $maquinariasPaginadas = null;
+        $asignacionesPaginadas = null;
+
+        if ($this->vistaActual === 'listado_maquinaria') {
+            $query = Maquinaria::query()->where('contratista_id', $this->contratistaId);
+            if ($this->unidadOrganizacionalId) {
+                $query->whereHas('unidadesOrganizacionales', fn($q) => $q->where('unidad_organizacional_mandante_id', $this->unidadOrganizacionalId));
+            } else {
+                $query->whereRaw('1 = 0');
+            }
+            if (!empty($this->searchMaquinaria)) {
+                $query->where(fn($q) => $q->where( \DB::raw("CONCAT(identificador_letras, identificador_numeros)"), 'like', '%' . str_replace('-', '', $this->searchMaquinaria) . '%')->orWhereHas('marca', fn($sub) => $sub->where('nombre', 'like', '%'.$this->searchMaquinaria.'%'))->orWhereHas('tipoMaquinaria', fn($sub) => $sub->where('nombre', 'like', '%'.$this->searchMaquinaria.'%')));
+            }
+            $maquinariasPaginadas = $query->with('tipoMaquinaria', 'marca')->orderBy($this->sortBy, $this->sortDirection)->paginate(10, ['*'], 'maquinariaPage');
+        } elseif ($this->vistaActual === 'listado_asignaciones' && $this->maquinariaSeleccionada) {
+            $asignacionesPaginadas = $this->maquinariaSeleccionada->unidadesOrganizacionales()->with('mandante:id,razon_social')->orderBy('pivot_is_active', 'desc')->orderBy('pivot_fecha_asignacion', 'desc')->paginate(10, ['*'], 'asignacionesPage');
+        }
+        return view('livewire.contratista.gestion-maquinaria', [
+            'maquinariasPaginadas' => $maquinariasPaginadas,
+            'asignacionesPaginadas' => $asignacionesPaginadas,
+        ]);
+    }
 }

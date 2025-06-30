@@ -39,12 +39,8 @@
                             @if ($documento->observacion_documento_snapshot)
                                 <div><strong class="font-semibold text-gray-700 dark:text-gray-300">Observación:</strong><p class="text-gray-600 dark:text-gray-400 italic">{{ $documento->observacion_documento_snapshot }}</p></div>
                             @endif
-                             @if($documento->fecha_emision)
-                                <div><strong class="font-semibold text-gray-700 dark:text-gray-300">Fecha Emisión (cargada):</strong><p class="text-blue-500 dark:text-blue-400 font-bold mt-1">{{ $documento->fecha_emision->format('d-m-Y') }}</p></div>
-                            @endif
-                             @if($documento->fecha_vencimiento)
-                                <div><strong class="font-semibold text-gray-700 dark:text-gray-300">Fecha Vencimiento:</strong><p class="text-blue-500 dark:text-blue-400 font-bold mt-1">{{ $documento->fecha_vencimiento->format('d-m-Y') }}</p></div>
-                            @endif
+                        
+                            
                             @if ($documento->reglaDocumental?->formatoDocumento?->ruta_archivo)
                                 <div><strong class="font-semibold text-gray-700 dark:text-gray-300">Formato:</strong><p><a href="{{ Storage::disk('public')->url($documento->reglaDocumental->formatoDocumento->ruta_archivo) }}" target="_blank" class="text-blue-500 hover:underline">{{ $documento->formato_documento_snapshot }}</a></p></div>
                             @elseif ($documento->formato_documento_snapshot)

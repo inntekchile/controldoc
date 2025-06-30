@@ -278,6 +278,23 @@
                                                          </select>
                                                          @error('etnia_id') <span class="error-message">{{ $message }}</span> @enderror
                                                      </div>
+
+                                                     {{-- ===================== INICIO DEL BLOQUE AÑADIDO ===================== --}}
+                                                     @if(!$trabajadorId)
+                                                        <div class="lg:col-span-4 section-title !border-none !pb-0">Datos de Vinculación Inicial</div>
+                                                        <div class="lg:col-span-2">
+                                                            <label for="cargo_mandante_id_nuevo" class="label-form">Cargo en Mandante <span class="text-red-500">*</span></label>
+                                                            <select id="cargo_mandante_id_nuevo" wire:model.defer="cargo_mandante_id_nuevo" class="input-field w-full">
+                                                                <option value="">Seleccione un cargo...</option>
+                                                                @foreach($cargosMandanteDisponibles as $cargo)
+                                                                    <option value="{{ $cargo->id }}">{{ $cargo->nombre_cargo }}</option>
+                                                                @endforeach
+                                                            </select>
+                                                            @error('cargo_mandante_id_nuevo') <span class="error-message">{{ $message }}</span> @enderror
+                                                        </div>
+                                                     @endif
+                                                     {{-- ====================== FIN DEL BLOQUE AÑADIDO ====================== --}}
+                                                     
                                                      <div class="lg:col-span-4 section-title !border-none !pb-0">Domicilio del Trabajador</div>
                                                      <div>
                                                          <label for="direccion_calle_trab" class="label-form">Calle</label>
